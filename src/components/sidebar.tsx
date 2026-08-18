@@ -52,18 +52,18 @@ export function Sidebar({
       {/* Top Section */}
       <div className="space-y-4">
         {/* Top Quick Actions */}
-        <div className="space-y-1">
-          <button className="w-full bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] font-semibold py-2 px-3 rounded-lg flex items-center gap-2 transition-colors">
-            <Plus className="w-4 h-4 text-[var(--primary)]" />
+        <div className="space-y-1.5">
+          <button className="w-full bg-[var(--primary)] text-white font-semibold py-2 px-4 rounded-full flex items-center justify-center gap-2 transition-all shadow-sm hover:opacity-90">
+            <Plus className="w-4 h-4 text-white" />
             <span>New Conversation</span>
           </button>
           
-          <button className="w-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] py-1.5 px-3 rounded-lg flex items-center gap-2 transition-colors">
+          <button className="w-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] py-2 px-4 rounded-full flex items-center gap-2 transition-colors">
             <History className="w-4 h-4" />
             <span>Conversation History</span>
           </button>
 
-          <button className="w-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] py-1.5 px-3 rounded-lg flex items-center gap-2 transition-colors">
+          <button className="w-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] py-2 px-4 rounded-full flex items-center gap-2 transition-colors">
             <Clock className="w-4 h-4" />
             <span>Scheduled Tasks</span>
           </button>
@@ -71,24 +71,24 @@ export function Sidebar({
 
         {/* Projects / Repositories Section */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between px-2 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+          <div className="flex items-center justify-between px-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
             <span>Projects ({repositories.length})</span>
             <button
               onClick={handleSync}
-              className="hover:text-[var(--foreground)] p-1 rounded-md transition-colors"
+              className="hover:text-[var(--foreground)] p-1 rounded-full transition-colors"
               title="Sync Repositories"
             >
               <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
             </button>
           </div>
 
-          <div className="space-y-3 overflow-y-auto max-h-[calc(100vh-280px)] pr-1">
+          <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-280px)] pr-1">
             {repositories.length === 0 ? (
-              <div className="p-3 text-center space-y-2 bg-[var(--background)] rounded-xl border border-[var(--border)]">
+              <div className="p-3 text-center space-y-2 bg-[var(--background)] rounded-2xl border border-[var(--border)]">
                 <p className="text-[11px] text-[var(--muted-foreground)]">No projects synced</p>
                 <button
                   onClick={handleSync}
-                  className="w-full bg-[var(--primary)] text-white text-[11px] font-semibold py-1 px-2 rounded-md"
+                  className="w-full bg-[var(--primary)] text-white text-[11px] font-semibold py-1.5 px-3 rounded-full"
                 >
                   Sync Repos
                 </button>
@@ -107,24 +107,24 @@ export function Sidebar({
                     {/* Repository Folder Header */}
                     <button
                       onClick={() => onSelectRepo(repo)}
-                      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition-colors font-medium text-left ${
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-full transition-all font-medium text-left ${
                         isSelected
-                          ? 'bg-[var(--primary)]/15 text-[var(--primary)] font-bold'
+                          ? 'bg-[var(--primary)] text-white font-bold shadow-xs'
                           : 'hover:bg-[var(--muted)] text-[var(--foreground)]'
                       }`}
                     >
-                      <Folder className={`w-3.5 h-3.5 ${isSelected ? 'text-[var(--primary)]' : 'text-[var(--muted-foreground)]'}`} />
+                      <Folder className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-[var(--muted-foreground)]'}`} />
                       <span className="truncate flex-1">{shortName}</span>
-                      <ChevronRight className={`w-3 h-3 transition-transform ${isSelected ? 'rotate-90 text-[var(--primary)]' : 'text-[var(--muted-foreground)]'}`} />
+                      <ChevronRight className={`w-3 h-3 transition-transform ${isSelected ? 'rotate-90 text-white' : 'text-[var(--muted-foreground)]'}`} />
                     </button>
 
                     {/* Sub-tasks / Conversations under Repository */}
                     {isSelected && (
-                      <div className="pl-6 space-y-0.5 border-l border-[var(--border)] ml-3">
+                      <div className="pl-6 space-y-1 border-l border-[var(--border)] ml-4 my-1">
                         {tasks.map((t, idx) => (
                           <button
                             key={idx}
-                            className="w-full flex items-center justify-between px-2 py-1 rounded-md text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors text-left"
+                            className="w-full flex items-center justify-between px-3 py-1.5 rounded-full text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors text-left"
                           >
                             <span className="truncate">{t.title}</span>
                             <span className="text-[9px] opacity-60 ml-1">{t.time}</span>
@@ -144,7 +144,7 @@ export function Sidebar({
       <div className="pt-2 border-t border-[var(--border)]">
         <button
           onClick={onOpenSettings}
-          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
+          className="w-full flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
         >
           <Settings className="w-4 h-4" />
           <span>Settings (BYOK Vault)</span>

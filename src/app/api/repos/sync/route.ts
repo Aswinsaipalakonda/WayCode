@@ -29,14 +29,20 @@ export async function POST() {
       }
     }
 
-    // Fallback: Fetch public repositories if providerToken is unavailable
     if (repos.length === 0 && githubUsername) {
-      const ghRes = await fetch(`https://api.github.com/users/${githubUsername}/repos?sort=updated&per_page=100`, {
+      const ghRes = await fetch(`https://api.github.com/users/${githubUsername}/repos?type=owner&sort=updated&per_page=100`, {
         headers: { Accept: 'application/vnd.github.v3+json' },
       })
       if (ghRes.ok) {
         repos = await ghRes.json()
       }
+    }
+
+    if (githubUsername && repos.length > 0) {
+      repos = repos.filter((r: { owner?: { login?: string }; full_name?: string }) => {
+        const ownerLogin = r.owner?.login || r.full_name?.split('/')[0]
+        return ownerLogin?.toLowerCase() === githubUsername.toLowerCase()
+      })
     }
 
     if (repos.length > 0) {

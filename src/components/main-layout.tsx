@@ -6,6 +6,7 @@ import { Sidebar } from '@/components/sidebar'
 import { ChatCanvas } from '@/components/chat-canvas'
 import { BottomNav } from '@/components/bottom-nav'
 import { SettingsDrawer } from '@/components/settings-drawer'
+import { ThemeOnboardingModal } from '@/components/theme-onboarding-modal'
 
 interface Repository {
   id: string
@@ -106,6 +107,9 @@ export function MainLayout({ user, initialRepositories }: MainLayoutProps) {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+
+      {/* Theme Onboarding Modal for First Time Logins */}
+      <ThemeOnboardingModal />
     </div>
   )
 }

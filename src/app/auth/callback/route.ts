@@ -23,7 +23,14 @@ export async function GET(request: Request) {
           })
 
           if (ghRes.ok) {
-            const repos = await ghRes.json()
+            const rawRepos = await ghRes.json()
+            const username = session.user.user_metadata?.user_name || session.user.user_metadata?.preferred_username
+            
+            // Filter strictly by repos owned by this user (excluding external forks/orgs)
+            const repos = username
+              ? rawRepos.filter((r: { owner?: { login?: string } }) => r.owner?.login?.toLowerCase() === username.toLowerCase())
+              : rawRepos
+
             const activeRepoNames = repos.map((r: { full_name: string }) => r.full_name)
 
             // Delete stale repositories no longer owned by user
