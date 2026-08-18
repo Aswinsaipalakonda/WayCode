@@ -73,8 +73,23 @@ export function Header({ user, repositories = [] }: HeaderProps) {
                   Connected Repositories ({repositories.length})
                 </div>
                 {repositories.length === 0 ? (
-                  <div className="p-3 text-center text-xs text-[var(--muted-foreground)]">
-                    No repositories authorized yet.
+                  <div className="p-3 text-center space-y-2">
+                    <div className="text-xs text-[var(--muted-foreground)]">
+                      No repositories synchronized yet.
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const res = await fetch('/api/repos/sync', { method: 'POST' })
+                        if (res.ok) {
+                          window.location.reload()
+                        } else {
+                          signInWithGitHub()
+                        }
+                      }}
+                      className="w-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white text-xs font-semibold py-1.5 px-3 rounded-lg transition-colors"
+                    >
+                      Sync Repositories Now
+                    </button>
                   </div>
                 ) : (
                   repositories.map((repo) => (
@@ -99,7 +114,7 @@ export function Header({ user, repositories = [] }: HeaderProps) {
                     className="w-full flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-[var(--primary)] hover:bg-[var(--primary)]/10 transition-colors"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
-                    Authorize More Repositories
+                    Re-Authorize GitHub Repositories
                   </button>
                 </div>
               </div>
