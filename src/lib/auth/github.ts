@@ -13,6 +13,9 @@ export function useGitHubAuth() {
       options: {
         redirectTo: `${origin}/auth/callback`,
         scopes: 'repo read:user user:email',
+        queryParams: {
+          prompt: 'consent',
+        },
       },
     })
   }
