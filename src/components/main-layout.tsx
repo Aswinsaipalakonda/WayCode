@@ -68,10 +68,10 @@ export function MainLayout({ user, initialRepositories }: MainLayoutProps) {
         {isSidebarOpen && (
           <div className="md:hidden fixed inset-0 z-50 flex">
             <div
-              className="fixed inset-0 bg-black/60 backdrop-blur-xs"
+              className="fixed inset-0 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
               onClick={() => setIsSidebarOpen(false)}
             />
-            <div className="relative z-10 w-72 h-full bg-[var(--card)] shadow-2xl">
+            <div className="relative z-10 w-72 h-full bg-[var(--card)] shadow-2xl animate-in slide-in-from-left duration-300">
               <Sidebar
                 repositories={repositories}
                 selectedRepo={selectedRepo}

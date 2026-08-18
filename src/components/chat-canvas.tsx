@@ -93,8 +93,8 @@ export function ChatCanvas({ repositories, selectedRepo, onSelectRepo }: ChatCan
           </button>
 
           {isRepoMenuOpen && (
-            <div className="absolute top-full mt-2 w-64 bg-[var(--card)] border border-[var(--border)] rounded-xl shadow-xl p-2 z-50 animate-in fade-in zoom-in-95">
-              <div className="text-[10px] font-bold text-[var(--muted-foreground)] px-2 py-1 uppercase tracking-wider">
+            <div className="absolute top-full mt-2 w-64 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+              <div className="text-[10px] font-bold text-[var(--muted-foreground)] px-3 py-1.5 uppercase tracking-wider">
                 Select Project Context
               </div>
               {repositories.length === 0 ? (

@@ -1,8 +1,10 @@
 import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/header'
+import { BottomNav } from '@/components/bottom-nav'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
-import { User, Mail, GitBranch, Shield, KeyRound, LogOut, CheckCircle2 } from 'lucide-react'
+import { Mail, GitBranch, Shield, LogOut } from 'lucide-react'
+import { ModeToggle } from '@/components/mode-toggle'
 
 export default async function ProfilePage() {
   const supabase = await createClient()
@@ -18,11 +20,11 @@ export default async function ProfilePage() {
     .order('created_at', { ascending: false })
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex flex-col">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex flex-col pb-20 md:pb-0">
       <Header user={user} repositories={repositories || []} />
 
-      <main className="flex-1 max-w-2xl w-full mx-auto p-4 md:p-8 space-y-6">
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-6 shadow-xl space-y-6">
+      <main className="flex-1 max-w-2xl w-full mx-auto p-4 md:p-8 space-y-6 animate-in slide-in-from-right duration-300">
+        <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl p-6 shadow-xl space-y-6">
           {/* User Header */}
           <div className="flex items-center gap-4 pb-6 border-b border-[var(--border)]">
             {user.user_metadata?.avatar_url ? (
@@ -31,10 +33,10 @@ export default async function ProfilePage() {
                 alt="User Avatar"
                 width={64}
                 height={64}
-                className="rounded-full border-2 border-[var(--primary)]"
+                className="rounded-full border-2 border-[var(--primary)] shadow-md"
               />
             ) : (
-              <div className="w-16 h-16 rounded-full bg-[var(--primary)] text-white text-2xl font-bold flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full bg-[var(--primary)] text-white text-2xl font-bold flex items-center justify-center shadow-md">
                 {user.email?.[0]?.toUpperCase() ?? 'U'}
               </div>
             )}
@@ -48,13 +50,23 @@ export default async function ProfilePage() {
             </div>
           </div>
 
-          {/* Details Form */}
+          {/* Details Form & Settings */}
           <div className="space-y-4 text-xs">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
+                Appearance & Theme Mode
+              </label>
+              <div className="flex items-center justify-between bg-[var(--background)] border border-[var(--border)] rounded-2xl p-3 text-[var(--foreground)]">
+                <span className="font-semibold">Toggle Color Scheme</span>
+                <ModeToggle />
+              </div>
+            </div>
+
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
                 Email Address
               </label>
-              <div className="flex items-center gap-2 bg-[var(--background)] border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)]">
+              <div className="flex items-center gap-2 bg-[var(--background)] border border-[var(--border)] rounded-2xl p-3 text-[var(--foreground)]">
                 <Mail className="w-4 h-4 text-[var(--primary)]" />
                 <span>{user.email}</span>
               </div>
@@ -64,12 +76,12 @@ export default async function ProfilePage() {
               <label className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
                 Connected Repositories
               </label>
-              <div className="flex items-center justify-between bg-[var(--background)] border border-[var(--border)] rounded-xl p-3 text-[var(--foreground)]">
+              <div className="flex items-center justify-between bg-[var(--background)] border border-[var(--border)] rounded-2xl p-3 text-[var(--foreground)]">
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-emerald-500" />
                   <span>{repositories?.length || 0} Repositories Synced</span>
                 </div>
-                <span className="text-[10px] bg-emerald-500/15 text-emerald-500 px-2 py-0.5 rounded-full font-semibold">
+                <span className="text-[10px] bg-emerald-500/15 text-emerald-500 px-2.5 py-1 rounded-full font-semibold">
                   OAuth Active
                 </span>
               </div>
@@ -80,7 +92,7 @@ export default async function ProfilePage() {
           <form action="/auth/signout" method="post" className="pt-4 border-t border-[var(--border)]">
             <button
               type="submit"
-              className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 font-semibold text-xs py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 font-semibold text-xs py-3 rounded-full transition-colors flex items-center justify-center gap-2 shadow-xs"
             >
               <LogOut className="w-4 h-4" />
               Sign Out Account
@@ -88,6 +100,9 @@ export default async function ProfilePage() {
           </form>
         </div>
       </main>
+
+      {/* Mobile 4-Tab Bottom Navigation */}
+      <BottomNav />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { Header } from '@/components/header'
-import { CheckSquare, Clock, Terminal, AlertCircle } from 'lucide-react'
+import { BottomNav } from '@/components/bottom-nav'
+import { CheckSquare, Clock, Terminal } from 'lucide-react'
 
 export default async function TasksPage() {
   const supabase = await createClient()
@@ -16,10 +17,10 @@ export default async function TasksPage() {
     .order('created_at', { ascending: false })
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex flex-col">
+    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex flex-col pb-20 md:pb-0">
       <Header user={user} repositories={repositories || []} />
 
-      <main className="flex-1 max-w-3xl w-full mx-auto p-4 md:p-8 space-y-4">
+      <main className="flex-1 max-w-3xl w-full mx-auto p-4 md:p-8 space-y-4 animate-in slide-in-from-bottom-4 duration-300">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold flex items-center gap-2">
             <CheckSquare className="w-5 h-5 text-[var(--primary)]" />
@@ -32,7 +33,7 @@ export default async function TasksPage() {
 
         <div className="space-y-3">
           {(!tasks || tasks.length === 0) ? (
-            <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-8 text-center space-y-2">
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl p-8 text-center space-y-2 shadow-md">
               <Clock className="w-8 h-8 text-[var(--muted-foreground)] mx-auto" />
               <h3 className="font-semibold text-sm">No Task Jobs Submitted Yet</h3>
               <p className="text-xs text-[var(--muted-foreground)]">
@@ -71,6 +72,9 @@ export default async function TasksPage() {
           )}
         </div>
       </main>
+
+      {/* Mobile 4-Tab Bottom Navigation */}
+      <BottomNav />
     </div>
   )
 }
