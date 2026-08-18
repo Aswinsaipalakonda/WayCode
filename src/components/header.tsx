@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { GitBranch, Settings, LogIn, LogOut, ChevronDown, Check, Sparkles } from 'lucide-react'
 import { useGitHubAuth } from '@/lib/auth/github'
 import { SettingsDrawer } from '@/components/settings-drawer'
+import { ModeToggle } from '@/components/mode-toggle'
 
 interface Repository {
   id: string
@@ -124,11 +125,14 @@ export function Header({ user, repositories = [] }: HeaderProps) {
 
         {/* Right Actions */}
         <div className="flex items-center gap-2">
+          {/* Shadcn Theme Mode Toggle */}
+          <ModeToggle />
+
           {user ? (
             <>
               <button
                 onClick={() => setIsSettingsOpen(true)}
-                className="p-2 rounded-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
+                className="p-2 rounded-full border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-colors"
                 title="AI Provider Settings (BYOK)"
               >
                 <Settings className="w-4 h-4" />

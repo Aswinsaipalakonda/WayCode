@@ -17,7 +17,8 @@ export async function POST() {
   }
 
   try {
-    const ghRes = await fetch('https://api.github.com/user/repos?sort=updated&per_page=50', {
+    // Fetch user owned repositories exclusively
+    const ghRes = await fetch('https://api.github.com/user/repos?affiliation=owner&sort=updated&per_page=100', {
       headers: {
         Authorization: `Bearer ${providerToken}`,
         Accept: 'application/vnd.github.v3+json',
@@ -30,6 +31,14 @@ export async function POST() {
     }
 
     const repos = await ghRes.json()
+    const activeRepoNames = repos.map((r: { full_name: string }) => r.full_name)
+
+    // Clear stale repositories
+    await supabase
+      .from('repositories')
+      .delete()
+      .eq('user_id', session.user.id)
+
     const repoRows = repos.map((r: { full_name: string; default_branch: string }) => ({
       user_id: session.user.id,
       repo_name: r.full_name,
@@ -47,7 +56,7 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json({ success: true, count: repoRows.length })
+    return NextResponse.json({ success: true, count: repoRows.length, repos: repoRows })
   } catch (err: unknown) {
     return NextResponse.json({ 
       error: err instanceof Error ? err.message : 'Unknown error' 

@@ -14,19 +14,17 @@
   --radius: 0.75rem;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #090D16;
-    --foreground: #F9FAFB;
-    --card: #161B22;
-    --card-foreground: #F9FAFB;
-    --primary: #0066FF;
-    --primary-hover: #0052CC;
-    --primary-foreground: #FFFFFF;
-    --muted: #1E293B;
-    --muted-foreground: #9CA3AF;
-    --border: rgba(255, 255, 255, 0.08);
-  }
+.dark {
+  --background: #090D16;
+  --foreground: #F9FAFB;
+  --card: #161B22;
+  --card-foreground: #F9FAFB;
+  --primary: #0066FF;
+  --primary-hover: #0052CC;
+  --primary-foreground: #FFFFFF;
+  --muted: #1E293B;
+  --muted-foreground: #9CA3AF;
+  --border: rgba(255, 255, 255, 0.08);
 }
 
 body {
@@ -35,4 +33,5 @@ body {
   font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
   min-height: 100vh;
   margin: 0;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }

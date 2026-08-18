@@ -11,11 +11,11 @@ export async function GET(request: Request) {
     const { data: { session }, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error && session) {
-      // Sync user GitHub repositories using provider token if available
       const providerToken = session.provider_token
       if (providerToken) {
         try {
-          const ghRes = await fetch('https://api.github.com/user/repos?sort=updated&per_page=30', {
+          // Fetch authenticated user's repositories (type=owner only to get user's exact repositories)
+          const ghRes = await fetch('https://api.github.com/user/repos?affiliation=owner&sort=updated&per_page=100', {
             headers: {
               Authorization: `Bearer ${providerToken}`,
               Accept: 'application/vnd.github.v3+json',
@@ -24,6 +24,22 @@ export async function GET(request: Request) {
 
           if (ghRes.ok) {
             const repos = await ghRes.json()
+            const activeRepoNames = repos.map((r: { full_name: string }) => r.full_name)
+
+            // Delete stale repositories no longer owned by user
+            if (activeRepoNames.length > 0) {
+              await supabase
+                .from('repositories')
+                .delete()
+                .eq('user_id', session.user.id)
+                .not('repo_name', 'in', `(${activeRepoNames.map((n: string) => `"${n}"`).join(',')})`)
+            } else {
+              await supabase
+                .from('repositories')
+                .delete()
+                .eq('user_id', session.user.id)
+            }
+
             const repoRows = repos.map((r: { full_name: string; default_branch: string }) => ({
               user_id: session.user.id,
               repo_name: r.full_name,
