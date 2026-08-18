@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Folder, Plus, ArrowRight, Paperclip, Terminal, Sparkles, CheckCircle2 } from 'lucide-react'
+import { Folder, Plus, ArrowRight, Terminal, Sparkles, CheckCircle2, Loader2 } from 'lucide-react'
 
 interface Repository {
   id: string
@@ -17,13 +17,50 @@ interface ChatCanvasProps {
 
 export function ChatCanvas({ repositories, selectedRepo, onSelectRepo }: ChatCanvasProps) {
   const [prompt, setPrompt] = useState('')
-  const [isSubmitted, setIsSubmitted] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submittedJob, setSubmittedJob] = useState<{
+    taskId: string
+    branchName: string
+    message: string
+  } | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [isRepoMenuOpen, setIsRepoMenuOpen] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!prompt.trim()) return
-    setIsSubmitted(true)
+    if (!prompt.trim() || isSubmitting) return
+
+    setIsSubmitting(true)
+    setError(null)
+
+    try {
+      const res = await fetch('/api/tasks/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          repoId: selectedRepo?.id,
+          repoName: selectedRepo?.repo_name || 'Default Repo',
+        }),
+      })
+
+      const data = await res.json()
+
+      if (res.status === 202 && data.success) {
+        setSubmittedJob({
+          taskId: data.taskId,
+          branchName: data.branchName,
+          message: data.message,
+        })
+        setPrompt('')
+      } else {
+        setError(data.error || 'Failed to submit task to queue')
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Network error')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   const shortRepoName = selectedRepo 
@@ -95,7 +132,7 @@ export function ChatCanvas({ repositories, selectedRepo, onSelectRepo }: ChatCan
             className="w-full bg-transparent border-0 text-sm text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:ring-0 focus:outline-hidden resize-none"
           />
 
-          {/* Action Row: Attachment (+) and Send (→) exclusively as requested */}
+          {/* Action Row: Attachment (+) and Send (→) */}
           <div className="flex items-center justify-between pt-2 border-t border-[var(--border)]">
             <button
               type="button"
@@ -107,17 +144,28 @@ export function ChatCanvas({ repositories, selectedRepo, onSelectRepo }: ChatCan
 
             <button
               type="submit"
-              disabled={!prompt.trim()}
-              className="p-2 rounded-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] disabled:opacity-40 text-white transition-all"
+              disabled={!prompt.trim() || isSubmitting}
+              className="p-2 rounded-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] disabled:opacity-40 text-white transition-all flex items-center justify-center"
               title="Send Intent"
             >
-              <ArrowRight className="w-4 h-4" />
+              {isSubmitting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ArrowRight className="w-4 h-4" />
+              )}
             </button>
           </div>
         </form>
 
+        {/* Submission Error Card */}
+        {error && (
+          <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-xs">
+            {error}
+          </div>
+        )}
+
         {/* Submission Telemetry Card */}
-        {isSubmitted && (
+        {submittedJob && (
           <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 shadow-md space-y-2 animate-in fade-in duration-300">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-[var(--primary)] flex items-center gap-1.5">
@@ -125,11 +173,11 @@ export function ChatCanvas({ repositories, selectedRepo, onSelectRepo }: ChatCan
                 Task Queued (HTTP 202 Accepted)
               </span>
               <span className="text-[10px] bg-emerald-500/15 text-emerald-500 px-2 py-0.5 rounded-full font-semibold">
-                Daemon Running
+                Redis Buffered
               </span>
             </div>
             <p className="text-xs text-[var(--muted-foreground)]">
-              Task assigned to <span className="font-semibold text-[var(--foreground)]">{shortRepoName}</span>. Your VPS daemon is cloning the repository and initializing the self-healing build loop.
+              Task assigned to <span className="font-semibold text-[var(--foreground)]">{shortRepoName}</span>. Target working branch: <code className="bg-[var(--muted)] px-1 py-0.5 rounded">{submittedJob.branchName}</code>.
             </p>
           </div>
         )}
