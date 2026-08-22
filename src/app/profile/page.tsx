@@ -24,7 +24,7 @@ export default async function ProfilePage() {
     'flex items-center justify-between gap-3 rounded-[22px] border border-black/[0.05] bg-white/90 p-4 shadow-[var(--shadow-sm)] transition-all duration-300 hover:border-black/[0.09] hover:bg-white'
 
   return (
-    <AppChrome user={user} initialRepositories={repositories || []}>
+    <AppChrome user={user} initialRepositories={repositories || []} bodyClassName="chat-scene">
       <div className="h-full overflow-y-auto pb-28 md:pb-10">
         <main className="anim-slide-right mx-auto w-full max-w-xl space-y-5 px-4 pt-5 sm:px-6">
           <div className="anim-fade-up pt-1">
@@ -37,7 +37,7 @@ export default async function ProfilePage() {
           </div>
 
           {/* Identity card */}
-          <div className="anim-fade-up stagger-2 relative overflow-hidden rounded-[30px] border border-black/[0.05] bg-white/90 p-6 shadow-[var(--shadow-md)] backdrop-blur">
+          <div className="anim-fade-up relative overflow-hidden rounded-[30px] border border-black/[0.05] bg-white/90 p-6 shadow-[var(--shadow-md)] backdrop-blur">
             <div
               aria-hidden
               className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-gradient-to-br from-[rgba(10,102,255,0.12)] to-[rgba(0,183,232,0.12)] blur-2xl"
@@ -75,7 +75,7 @@ export default async function ProfilePage() {
           </div>
 
           {/* Rows */}
-          <div className="anim-fade-up stagger-3 space-y-2.5">
+          <div className="anim-fade-up space-y-2.5">
             <p className="px-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
               Account
             </p>
@@ -118,7 +118,7 @@ export default async function ProfilePage() {
           </div>
 
           {/* Sign out */}
-          <form action="/auth/signout" method="post" className="anim-fade-up stagger-4">
+          <form action="/auth/signout" method="post" className="anim-fade-up">
             <button
               type="submit"
               className="pressable flex w-full items-center justify-center gap-2 rounded-full border border-[var(--error)]/25 bg-white/80 py-3.5 text-[13px] font-bold text-[var(--error)] shadow-[var(--shadow-sm)] backdrop-blur hover:bg-[var(--error)] hover:text-white"

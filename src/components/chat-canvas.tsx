@@ -13,6 +13,9 @@ import {
   FileCode2,
   CircleAlert,
   CheckCircle2,
+  X,
+  Copy,
+  Check,
 } from 'lucide-react'
 import { TelemetryStreamer } from '@/components/telemetry-streamer'
 import { DiffReviewModal } from '@/components/diff-review-modal'
@@ -47,7 +50,7 @@ export function ChatCanvas() {
 }
 
 function ChatThread() {
-  const { user, selectedRepo, openRepoPicker } = useAppChrome()
+  const { user, selectedRepo, openRepoPicker, onSelectRepo } = useAppChrome()
 
   const [messages, setMessages] = useState<ThreadMessage[]>([])
   const [prompt, setPrompt] = useState('')
@@ -189,22 +192,39 @@ function ChatThread() {
               Choose a repository, describe the change you want, and review it before anything ships.
             </motion.p>
 
-            <motion.button
+            <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2, duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.97 }}
-              onClick={openRepoPicker}
-              className={`pressable mt-8 flex items-center gap-2 rounded-full border bg-white/80 backdrop-blur px-4 py-2.5 text-[13px] font-semibold shadow-[var(--shadow-md)] ${
-                selectedRepo
-                  ? 'border-[var(--brand)]/30 text-[var(--brand)]'
-                  : 'border-black/10 text-[var(--foreground-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
-              }`}
+              className="mt-8 flex items-center gap-1"
             >
-              <Image src="/logo.png" alt="" width={15} height={15} />
-              {selectedRepo ? selectedRepo.repo_name.split('/')[1] || selectedRepo.repo_name : 'Select repository'}
-            </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={openRepoPicker}
+                className={`pressable flex items-center gap-2 rounded-full border bg-white/80 backdrop-blur px-4 py-2.5 text-[13px] font-semibold shadow-[var(--shadow-md)] ${
+                  selectedRepo
+                    ? 'border-[var(--brand)]/30 text-[var(--brand)]'
+                    : 'border-black/10 text-[var(--foreground-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
+                }`}
+              >
+                <Image src="/logo.png" alt="" width={15} height={15} />
+                {selectedRepo ? selectedRepo.repo_name.split('/')[1] || selectedRepo.repo_name : 'Select repository'}
+              </motion.button>
+              {selectedRepo && (
+                <button
+                  onClick={() => {
+                    onSelectRepo(null)
+                    toast('Repository removed', { description: 'Pick another one whenever you are ready.' })
+                  }}
+                  aria-label="Remove repository"
+                  title="Remove repository"
+                  className="pressable rounded-full p-2 text-[var(--muted-foreground)] hover:bg-[var(--error-soft)] hover:text-[var(--error)]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </motion.div>
           </div>
         ) : (
           <div className="mx-auto w-full max-w-2xl space-y-4 px-4 pt-4 sm:px-6">
@@ -288,29 +308,45 @@ function ChatThread() {
             className="rounded-[28px] border border-white/70 bg-white/75 p-3 shadow-[var(--shadow-composer)] backdrop-blur-xl transition-shadow duration-300 focus-within:border-white focus-within:shadow-[0_18px_54px_-18px_rgba(10,102,255,0.35),0_2px_10px_-3px_rgba(26,30,40,0.08)]"
           >
             {/* Repository chip */}
-            <button
-              type="button"
-              onClick={openRepoPicker}
-              aria-label="Choose repository"
-              className={`pressable mb-2 inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                selectedRepo
-                  ? 'border-transparent bg-[var(--brand-soft)] text-[var(--brand)]'
-                  : 'border-dashed border-black/15 text-[var(--muted-foreground)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
-              }`}
-            >
-              <Image src="/logo.png" alt="" width={13} height={13} />
-              <span className="truncate">
-                {selectedRepo
-                  ? selectedRepo.repo_name.split('/')[1] || selectedRepo.repo_name
-                  : 'Select repository'}
-              </span>
-              {selectedRepo && (
-                <span className="hidden items-center gap-1 font-mono-code text-[9.5px] font-medium normal-case text-[var(--muted-foreground)] xs:inline-flex">
-                  <GitBranch className="h-2.5 w-2.5" />
-                  {selectedRepo.default_branch || 'main'}
+            <div className="mb-2 flex items-center gap-0.5">
+              <button
+                type="button"
+                onClick={openRepoPicker}
+                aria-label="Choose repository"
+                className={`pressable inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                  selectedRepo
+                    ? 'border-transparent bg-[var(--brand-soft)] text-[var(--brand)]'
+                    : 'border-dashed border-black/15 text-[var(--muted-foreground)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
+                }`}
+              >
+                <Image src="/logo.png" alt="" width={13} height={13} />
+                <span className="truncate">
+                  {selectedRepo
+                    ? selectedRepo.repo_name.split('/')[1] || selectedRepo.repo_name
+                    : 'Select repository'}
                 </span>
+                {selectedRepo && (
+                  <span className="hidden items-center gap-1 font-mono-code text-[9.5px] font-medium normal-case text-[var(--muted-foreground)] xs:inline-flex">
+                    <GitBranch className="h-2.5 w-2.5" />
+                    {selectedRepo.default_branch || 'main'}
+                  </span>
+                )}
+              </button>
+              {selectedRepo && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectRepo(null)
+                    toast('Repository removed', { description: 'Tasks need a repository — pick one to continue.' })
+                  }}
+                  aria-label="Remove repository"
+                  title="Remove repository"
+                  className="pressable rounded-full p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--error-soft)] hover:text-[var(--error)]"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               )}
-            </button>
+            </div>
 
             <textarea
               ref={textareaRef}
@@ -370,11 +406,19 @@ const STATUS_META: Record<string, { label: string; cls: string; pulse?: boolean 
   rejected: { label: 'Rejected', cls: 'bg-[rgba(120,128,140,0.14)] text-[#585e68]' },
 }
 
+const PIPELINE_STEPS = [
+  { key: 'queued', label: 'Queued', hint: 'Task accepted and waiting for a worker' },
+  { key: 'generating', label: 'Generating', hint: 'AI is writing the changes on your branch' },
+  { key: 'verifying', label: 'Verifying', hint: 'Compile & syntax checks are running' },
+  { key: 'review', label: 'Review', hint: 'Diff is ready — nothing ships until you approve' },
+] as const
+
 function TaskCard({ task }: { task: QueuedTask }) {
   const supabase = createClient()
   const [status, setStatus] = useState<string>('queued')
   const [diffContent, setDiffContent] = useState<string | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
 
   // Catch up on current state, then follow live updates.
   useEffect(() => {
@@ -412,14 +456,35 @@ function TaskCard({ task }: { task: QueuedTask }) {
     }
   }, [supabase, task.taskId])
 
-  const meta = STATUS_META[status?.toLowerCase()] ?? {
+  const statusLower = status?.toLowerCase()
+  const meta = STATUS_META[statusLower] ?? {
     label: status || 'Queued',
     cls: 'bg-[rgba(120,128,140,0.14)] text-[#585e68]',
   }
-  const statusLower = status?.toLowerCase()
   const reviewable =
     !!diffContent && ['verifying', 'build_verified', 'completed', 'success'].includes(statusLower)
   const failed = statusLower === 'failed'
+
+  // Map raw status → pipeline stage index.
+  const stepIndex = ['completed', 'success'].includes(statusLower)
+    ? 3
+    : ['verifying', 'build_verified'].includes(statusLower)
+      ? 2
+      : statusLower === 'processing'
+        ? 1
+        : 0
+
+  const copyText = async (key: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiedField(key)
+      window.setTimeout(() => {
+        setCopiedField((cur) => (cur === key ? null : cur))
+      }, 1500)
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
 
   return (
     <>
@@ -431,14 +496,29 @@ function TaskCard({ task }: { task: QueuedTask }) {
         className="overflow-hidden rounded-[24px] border border-black/[0.05] bg-white/90 shadow-[var(--shadow-md)] backdrop-blur"
       >
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 px-4 pt-3.5 pb-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] p-[1.5px]">
-              <span className="flex h-full w-full items-center justify-center rounded-[7px] bg-white">
-                <Image src="/logo.png" alt="" width={14} height={14} className="object-contain" />
+        <div className="flex items-start justify-between gap-3 px-4 pt-3.5 pb-2">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] p-[1.5px]">
+              <span className="flex h-full w-full items-center justify-center rounded-[10px] bg-white">
+                <Image src="/logo.png" alt="" width={15} height={15} className="object-contain" />
               </span>
             </span>
-            <p className="truncate text-[13px] font-semibold">WayCode</p>
+            <div className="group/id min-w-0">
+              <p className="truncate text-[13px] font-bold leading-tight">WayCode Agent</p>
+              <button
+                type="button"
+                onClick={() => copyText('task-id', task.taskId)}
+                title={copiedField === 'task-id' ? 'Copied!' : `Copy task ID · ${task.taskId}`}
+                className="pressable mt-0.5 flex items-center gap-1 rounded font-mono-code text-[9.5px] text-[var(--muted-foreground)] hover:text-[var(--brand)]"
+              >
+                waycode/{task.taskId.slice(0, 12)}
+                {copiedField === 'task-id' ? (
+                  <Check className="h-2.5 w-2.5 text-[var(--success)]" />
+                ) : (
+                  <Copy className="h-2.5 w-2.5 opacity-40 transition-opacity group-hover/id:opacity-100" />
+                )}
+              </button>
+            </div>
           </div>
           <span
             className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${meta.cls}`}
@@ -449,14 +529,30 @@ function TaskCard({ task }: { task: QueuedTask }) {
         </div>
 
         {/* Branch line */}
-        <div className="flex items-center gap-1.5 px-4 pb-2 text-[11px] text-[var(--muted-foreground)]">
+        <div className="group/branch flex items-center gap-1.5 px-4 pb-2.5 text-[11px] text-[var(--muted-foreground)]">
           <GitBranch className="h-3 w-3 shrink-0" />
           <code className="truncate font-mono-code">{task.branchName}</code>
+          <button
+            type="button"
+            onClick={() => copyText('branch', task.branchName)}
+            aria-label="Copy branch name"
+            title="Copy branch name"
+            className="pressable ml-auto shrink-0 rounded-md p-1 opacity-0 transition-opacity hover:text-[var(--brand)] focus-visible:opacity-100 group-hover/branch:opacity-100"
+          >
+            {copiedField === 'branch' ? (
+              <Check className="h-3 w-3 text-[var(--success)]" />
+            ) : (
+              <Copy className="h-3 w-3" />
+            )}
+          </button>
         </div>
+
+        {/* Pipeline stepper */}
+        <Pipeline current={stepIndex} failed={failed} rejected={statusLower === 'rejected'} />
 
         {/* Live activity */}
         <div className="mx-4 mb-2">
-          <TelemetryStreamer taskId={task.taskId} />
+          <TelemetryStreamer taskId={task.taskId} active={!['completed', 'success', 'failed', 'rejected'].includes(statusLower)} />
         </div>
 
         {/* Review CTA / failure note */}
@@ -504,5 +600,81 @@ function TaskCard({ task }: { task: QueuedTask }) {
         diffContent={diffContent ?? ''}
       />
     </>
+  )
+}
+
+function Pipeline({
+  current,
+  failed,
+  rejected,
+}: {
+  current: number
+  failed: boolean
+  rejected: boolean
+}) {
+  const pct = (current / (PIPELINE_STEPS.length - 1)) * 100
+
+  return (
+    <div className="mx-4 mb-3 mt-1">
+      <div className="relative flex items-start justify-between">
+        {/* Track */}
+        <div className="absolute left-[12.5%] right-[12.5%] top-[7px] h-[2px] rounded-full bg-black/[0.07]">
+          <motion.div
+            initial={{ width: 0 }}
+            animate={{ width: `${failed || rejected ? Math.max(pct - 33, 0) : pct}%` }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            className={`h-full rounded-full ${
+              failed ? 'bg-[var(--error)]' : 'bg-gradient-to-r from-[var(--brand)] to-[var(--cyan)]'
+            }`}
+          />
+        </div>
+
+        {PIPELINE_STEPS.map((step, i) => {
+          const done = i < current && !(failed || rejected)
+          const isCurrent = i === current
+          const isError = isCurrent && failed
+          const isRejected = isCurrent && rejected
+
+          return (
+            <div key={step.key} className="relative z-10 flex w-1/4 flex-col items-center gap-1" title={step.hint}>
+              <span
+                className={`flex h-[14px] w-[14px] items-center justify-center rounded-full border-2 transition-colors duration-300 ${
+                  isError
+                    ? 'border-[var(--error)] bg-[var(--error)]'
+                    : isRejected
+                      ? 'border-[var(--muted-foreground)] bg-[var(--background)]'
+                      : done
+                        ? 'border-transparent bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)]'
+                        : isCurrent
+                          ? 'border-[var(--brand)] bg-white'
+                          : 'border-black/10 bg-white'
+                }`}
+              >
+                {done && <Check className="h-[8px] w-[8px] text-white" strokeWidth={3.5} />}
+                {isError && <X className="h-[8px] w-[8px] text-white" strokeWidth={3.5} />}
+                {isCurrent && !isError && !isRejected && (
+                  <span className="h-[5px] w-[5px] animate-pulse rounded-full bg-[var(--brand)]" />
+                )}
+              </span>
+              <span
+                className={`text-[9px] font-bold leading-none ${
+                  isError
+                    ? 'text-[var(--error)]'
+                    : isRejected
+                      ? 'text-[var(--muted-foreground)]'
+                      : done
+                        ? 'text-[var(--foreground-secondary)]'
+                        : isCurrent
+                          ? 'text-[var(--foreground)]'
+                          : 'text-[var(--muted-foreground)] opacity-70'
+                }`}
+              >
+                {isError ? 'Failed' : step.label}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }

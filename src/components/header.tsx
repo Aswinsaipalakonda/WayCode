@@ -33,7 +33,7 @@ export function Header({ user, onMenuClick }: HeaderProps) {
   }, [])
 
   return (
-    <header className="sticky top-0 z-40 h-14 w-full border-b border-[var(--chrome-border)] bg-[rgba(20,22,28,0.94)] px-2 flex items-center justify-between backdrop-blur-xl">
+    <header className="sticky top-0 z-40 h-14 w-full border-b border-[var(--chrome-border)] bg-[var(--chrome-bg)] px-2 flex items-center justify-between">
       {/* Left: hamburger + brand */}
       <div className="flex items-center gap-1 min-w-0">
         <button
@@ -44,13 +44,11 @@ export function Header({ user, onMenuClick }: HeaderProps) {
           <Menu className="h-5 w-5" />
         </button>
 
-        <Link href="/" className="flex items-center gap-2 pl-1 group">
-          <span className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] p-[1.5px] shadow-[0_1px_10px_-2px_var(--brand-glow)] transition-transform duration-300 group-hover:scale-105 group-active:scale-95">
-            <span className="flex w-full h-full items-center justify-center rounded-[7px] bg-[#1d2027]">
-              <Image src="/logo.png" alt="" width={16} height={16} className="object-contain" />
-            </span>
+        <Link href="/" className="flex items-center gap-2.5 pl-1 group">
+          <span className="relative w-8 h-8 shrink-0 overflow-hidden rounded-xl transition-transform duration-300 group-hover:scale-105 group-active:scale-95">
+            <Image src="/logo.png" alt="WayCode logo" width={32} height={32} className="h-full w-full object-cover" />
           </span>
-          <span className="text-gradient-brand font-bold text-[17px] tracking-tight">
+          <span className="text-gradient-brand font-extrabold text-[17px] tracking-tight">
             WayCode
           </span>
         </Link>

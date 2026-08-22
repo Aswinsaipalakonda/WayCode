@@ -18,7 +18,7 @@ export default async function TasksPage() {
     .order('created_at', { ascending: false })
 
   return (
-    <AppChrome user={user} initialRepositories={repositories || []}>
+    <AppChrome user={user} initialRepositories={repositories || []} bodyClassName="chat-scene">
       <div className="h-full overflow-y-auto pb-28 md:pb-10">
         <main className="anim-slide-right mx-auto w-full max-w-3xl px-4 pt-5 sm:px-6">
           <TaskBoard tasks={tasks || []} />
