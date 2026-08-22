@@ -355,6 +355,15 @@ body {
   animation-play-state: paused;
 }
 
+/* Flowing dashed connector lines (integrations graph) */
+.flow-line {
+  stroke-dasharray: 1.6 1.2;
+  animation: dash-flow 2s linear infinite;
+}
+@keyframes dash-flow {
+  to { stroke-dashoffset: -5.6; }
+}
+
 /* Soft mesh backdrop for the hero — cobalt + cyan + sand only */
 .hero-mesh {
   background:
