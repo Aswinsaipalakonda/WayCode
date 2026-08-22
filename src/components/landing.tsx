@@ -1,652 +1,727 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { motion } from 'motion/react'
 import Image from 'next/image'
-import { motion, useInView, AnimatePresence } from 'motion/react'
 import {
+  Search,
+  Home,
+  History,
+  FolderGit2,
+  Settings2,
+  Plus,
+  ChevronRight,
+  GitBranch,
+  CheckCircle2,
+  GitPullRequest,
   Zap,
   Terminal,
   Hammer,
   ShieldCheck,
-  ChevronDown,
-  CheckCircle2,
-  GitPullRequest,
   Lock,
 } from 'lucide-react'
-import { SiOpenrouter, SiGooglegemini } from 'react-icons/si'
-import { TbApi } from 'react-icons/tb'
 import { useGitHubAuth } from '@/lib/auth/github'
 import { GithubIcon } from '@/components/icons'
 
-const WORK_IMG =
-  'https://images.unsplash.com/photo-1512941937669-90a1b58e7e9c?q=80&w=1600&auto=format&fit=crop'
-
 const ease = [0.16, 1, 0.3, 1] as const
+const DEVICON = 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons'
 
-/* ============================================================ */
-/* Animated counter                                              */
-/* ============================================================ */
-function Counter({ to, prefix = '', suffix = '' }: { to: number; prefix?: string; suffix?: string }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const inView = useInView(ref, { once: true, margin: '-40px' })
-  const [val, setVal] = useState(0)
-
-  useEffect(() => {
-    if (!inView) return
-    let raf = 0
-    const start = performance.now()
-    const dur = 1400
-    const tick = (t: number) => {
-      const p = Math.min(1, (t - start) / dur)
-      setVal(Math.round(to * (1 - Math.pow(1 - p, 3))))
-      if (p < 1) raf = requestAnimationFrame(tick)
-    }
-    raf = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(raf)
-  }, [inView, to])
-
+function DevIcon({ slug, className }: { slug: string; className?: string }) {
   return (
-    <span ref={ref}>
-      {prefix}
-      {val}
-      {suffix}
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={`${DEVICON}/${slug}/${slug}-original.svg`}
+      alt=""
+      loading="lazy"
+      className={className ?? 'h-6 w-6 object-contain'}
+    />
   )
 }
 
 /* ============================================================ */
-/* Feature card with mouse-follow glow                           */
+/* Hero app-window mockup                                        */
 /* ============================================================ */
-function GlowCard({
-  Icon,
-  title,
-  copy,
-  index,
-}: {
-  Icon: typeof Zap
-  title: string
-  copy: string
-  index: number
-}) {
-  return (
-    <motion.article
-      initial={{ opacity: 0, y: 22 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '-60px' }}
-      transition={{ duration: 0.55, delay: index * 0.08, ease }}
-      onMouseMove={(e) => {
-        const r = e.currentTarget.getBoundingClientRect()
-        e.currentTarget.style.setProperty('--mx', `${e.clientX - r.left}px`)
-        e.currentTarget.style.setProperty('--my', `${e.clientY - r.top}px`)
-      }}
-      className="card-surface group relative overflow-hidden rounded-[24px] p-6"
-    >
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-100"
-        style={{
-          background:
-            'radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%), rgba(10,102,255,0.09), transparent 65%)',
-        }}
-      />
-      <span className="relative inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] text-white shadow-[0_6px_18px_-6px_var(--brand-glow)] transition-transform duration-300 group-hover:scale-110">
-        <Icon className="h-5 w-5" />
-      </span>
-      <h3 className="relative mt-4 text-[15px] font-bold">{title}</h3>
-      <p className="relative mt-2 text-[13px] leading-relaxed text-[var(--foreground-secondary)]">{copy}</p>
-    </motion.article>
-  )
-}
-
-/* ============================================================ */
-/* Interactive phone demo — auto-playing task lifecycle          */
-/* ============================================================ */
-const STAGE_LABELS = ['Prompt', 'Queued', 'Working', 'Verify', 'Review', 'Shipped']
-const STAGE_DURATIONS = [750, 1000, 1300, 1500, 1300, 1200]
-
-const LOG_LINES = [
-  { cls: 'text-slate-500', text: '$ git clone --depth 1 ✓ 1.2s' },
-  { cls: 'text-sky-600', text: 'read_file src/api/checkout.ts' },
-  { cls: 'text-teal-600', text: 'edit_file src/api/checkout.ts +12 −3' },
-  { cls: 'text-emerald-600', text: 'tsc --noEmit ✓ 0 errors' },
+const BAR_HEIGHTS = [
+  34, 52, 40, 66, 48, 58, 44, 72, 38, 56, 94, 86, 60, 42, 50, 62, 46, 68, 54,
+  63, 45, 58, 71, 49, 57, 41,
 ]
 
-function PhoneDemo() {
-  const ref = useRef<HTMLDivElement>(null)
-  const inView = useInView(ref, { margin: '-80px' })
-  const startedRef = useRef(false)
-  const [stage, setStage] = useState(0)
-  const [playing, setPlaying] = useState(false)
+const TASK_ROWS = [
+  { id: 'waycode/task-a91f2c', repo: 'Skillvault-047', status: 'Completed', cls: 'bg-emerald-50 text-emerald-600', dot: 'bg-emerald-500', changes: '+142 −38' },
+  { id: 'waycode/task-7c3d9e', repo: 'GramaVoice', status: 'Working', cls: 'bg-blue-50 text-blue-600', dot: 'bg-blue-500', live: true, changes: '+26 −7' },
+  { id: 'waycode/task-b52f08', repo: 'AswinSaii', status: 'Review ready', cls: 'bg-amber-50 text-amber-600', dot: 'bg-amber-500', changes: '+64 −12' },
+  { id: 'waycode/task-e11c44', repo: 'Skillvault-047', status: 'Failed', cls: 'bg-red-50 text-red-500', dot: 'bg-red-400', changes: '—' },
+]
 
-  useEffect(() => {
-    if (inView && !startedRef.current) {
-      startedRef.current = true
-      setPlaying(true)
-    }
-  }, [inView])
-
-  useEffect(() => {
-    if (!playing || stage >= STAGE_LABELS.length) return
-    const t = setTimeout(() => setStage((s) => s + 1), STAGE_DURATIONS[stage])
-    return () => clearTimeout(t)
-  }, [playing, stage])
-
-  const jumpTo = (i: number) => {
-    setStage(i + 1)
-    setPlaying(false)
-  }
-  const replay = () => {
-    setStage(0)
-    setPlaying(true)
-  }
-
-  // Derived demo state
-  const activeStep = Math.min(Math.max(stage - 2, 0), 3)
-  const allDone = stage >= 6
-  const badge =
-    stage >= 6
-      ? { label: 'SHIPPED', cls: 'bg-[var(--success-soft)] text-[var(--success)]' }
-      : stage >= 5
-        ? { label: 'REVIEW', cls: 'bg-[var(--warning-soft)] text-[var(--warning)]' }
-        : stage >= 3
-          ? { label: 'WORKING', cls: 'bg-[var(--brand-soft)] text-[var(--brand)]' }
-          : { label: 'QUEUED', cls: 'bg-black/[0.06] text-[#585e68]' }
-
+function AppWindowMockup() {
   return (
-    <div ref={ref} className="relative mx-auto w-[290px] sm:w-[320px]">
-      {/* Frame */}
-      <div className="overflow-hidden rounded-[44px] border-[10px] border-[#14161c] bg-white shadow-[0_48px_90px_-32px_rgba(10,20,40,0.4)]">
-        <div className="flex items-center justify-between px-6 pt-2.5 text-[9px] font-semibold text-slate-400">
-          <span>9:41</span>
-          <span className="tracking-tighter">●●●●</span>
+    <motion.div
+      initial={{ opacity: 0, y: 40 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, margin: '-60px' }}
+      transition={{ duration: 0.85, ease }}
+      className="relative"
+    >
+      {/* floating chips */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ delay: 0.5, duration: 0.5, ease }}
+        className="absolute -left-4 -top-6 z-10 hidden items-center gap-2 rounded-2xl border border-black/[0.06] bg-white px-3.5 py-2.5 shadow-[0_16px_40px_-16px_rgba(26,30,40,0.3)] lg:flex"
+      >
+        <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-emerald-50">
+          <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+        </span>
+        <div>
+          <p className="text-[11px] font-bold leading-tight">Build verified</p>
+          <p className="font-mono-code text-[9px] text-zinc-400">tsc --noEmit ✓ 0 errors</p>
         </div>
-        <div className="flex items-center gap-2 border-b border-black/5 px-4 py-2.5">
-          <Image src="/logo.png" alt="" width={20} height={20} className="rounded-md" />
-          <span className="text-[12px] font-bold">WayCode</span>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ delay: 0.65, duration: 0.5, ease }}
+        className="absolute -right-4 bottom-16 z-10 hidden items-center gap-1.5 rounded-full bg-[#14161c] px-3.5 py-2 shadow-[0_16px_40px_-14px_rgba(20,22,28,0.55)] lg:flex"
+      >
+        <GitPullRequest className="h-3.5 w-3.5 text-cyan-300" />
+        <span className="font-mono-code text-[10px] text-slate-200">PR #42 opened</span>
+      </motion.div>
+
+      {/* window */}
+      <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white shadow-[0_60px_120px_-40px_rgba(26,30,40,0.35)]">
+        {/* chrome */}
+        <div className="flex items-center gap-3 border-b border-black/[0.05] bg-[#fafaf9] px-4 py-2.5">
+          <span className="flex gap-1.5">
+            <i className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
+            <i className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
+            <i className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
+          </span>
+          <span className="mx-auto hidden items-center gap-1.5 rounded-md bg-black/[0.04] px-3 py-1 font-mono-code text-[10px] text-zinc-400 sm:flex">
+            <Lock className="h-2.5 w-2.5" /> waycode.app
+          </span>
+          <span className="w-10" />
         </div>
 
-        <div className="min-h-[400px] space-y-3 bg-[#f7f5f0] px-3 py-4">
-          <AnimatePresence>
-            {stage >= 1 && (
-              <motion.div
-                key="prompt"
-                initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                transition={{ duration: 0.35, ease }}
-                className="flex justify-end"
+        <div className="flex">
+          {/* sidebar */}
+          <aside className="hidden w-52 shrink-0 flex-col border-r border-black/[0.05] bg-[#fbfbfa] p-3 md:flex">
+            <div className="flex items-center gap-2 px-1.5 pb-3">
+              <Image src="/logo.png" alt="" width={22} height={22} className="rounded-md" />
+              <span className="text-[13px] font-bold">WayCode</span>
+            </div>
+            <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-black/[0.06] bg-white px-2.5 py-1.5 text-[11px] text-zinc-400">
+              <Search className="h-3 w-3" /> Quick search…
+            </div>
+            {[
+              { Icon: Home, label: 'Home' },
+              { Icon: Plus, label: 'New Task' },
+              { Icon: History, label: 'Job History' },
+              { Icon: FolderGit2, label: 'Repositories' },
+              { Icon: Settings2, label: 'Settings' },
+            ].map(({ Icon, label }) => (
+              <span
+                key={label}
+                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11.5px] ${
+                  label === 'Home' ? 'bg-[var(--brand-soft)] font-semibold text-[var(--brand)]' : 'font-medium text-zinc-500'
+                }`}
               >
-                <div className="max-w-[85%] rounded-[18px] rounded-br-md bg-[var(--brand)] px-3 py-2 text-[11px] font-medium leading-snug text-white shadow-sm">
-                  Fix the null check in checkout API before Friday 🚀
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <Icon className="h-3.5 w-3.5" /> {label}
+              </span>
+            ))}
+            <p className="mt-4 px-1.5 pb-1 text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-400">
+              Repositories · 3
+            </p>
+            {['Skillvault-047', 'GramaVoice', 'AswinSaii'].map((r) => (
+              <span key={r} className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-[11.5px] font-medium text-zinc-600">
+                <GitBranch className="h-3 w-3 text-zinc-300" /> {r}
+              </span>
+            ))}
+          </aside>
 
-          {stage >= 2 && (
-            <motion.div
-              initial={{ opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, ease }}
-              className="rounded-2xl border border-black/[0.05] bg-white p-3 shadow-[var(--shadow-sm)]"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="flex items-center gap-1.5 text-[10px] font-bold">
-                  <span className={`flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br ${allDone ? 'from-emerald-400 to-emerald-500' : 'from-[var(--brand)] to-[var(--cyan)]'} p-px`}>
-                    <span className="flex h-full w-full items-center justify-center rounded-[5px] bg-white">
-                      <Image src="/logo.png" alt="" width={10} height={10} />
-                    </span>
-                  </span>
-                  Agent
-                </span>
-                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[8px] font-bold tracking-wide ${badge.cls}`}>
-                  {(stage === 3 || stage === 4) && <span className="live-dot" style={{ width: 4, height: 4 }} />}
-                  {badge.label}
-                </span>
-              </div>
+          {/* main */}
+          <div className="min-w-0 flex-1 p-4 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[13px] font-bold sm:text-sm">Task activity — last 14 days</p>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-600">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                Daemon operational
+              </span>
+            </div>
 
-              {/* mini pipeline */}
-              <div className="relative mt-3 flex items-start justify-between px-0.5">
-                <div className="absolute left-[8%] right-[8%] top-[5px] h-[2px] rounded bg-black/[0.07]">
-                  <motion.div
-                    animate={{ width: `${(activeStep / 3) * 100}%` }}
-                    transition={{ duration: 0.6, ease }}
-                    className={`h-full rounded-full ${allDone ? 'bg-emerald-400' : 'bg-gradient-to-r from-[var(--brand)] to-[var(--cyan)]'}`}
+            {/* legend */}
+            <div className="mt-3 flex gap-3 text-[10px] font-medium text-zinc-400">
+              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-zinc-200" /> Queued</span>
+              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-[var(--brand)]" /> Running</span>
+              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-sm bg-emerald-400" /> Verified</span>
+            </div>
+
+            {/* chart */}
+            <div className="mt-3 flex h-32 items-end gap-[5px] sm:h-40">
+              {BAR_HEIGHTS.map((h, i) => {
+                const accent = i === 10 ? 'var(--brand)' : i === 11 ? '#e69600' : i === 12 ? 'var(--cyan)' : null
+                return (
+                  <motion.i
+                    key={i}
+                    initial={{ height: '6%' }}
+                    whileInView={{ height: `${h}%` }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.15 + i * 0.028, duration: 0.55, ease }}
+                    className={`w-full rounded-t-[4px] ${accent ? '' : 'bg-zinc-200/80'}`}
+                    style={accent ? { background: accent } : undefined}
                   />
-                </div>
-                {[0, 1, 2, 3].map((i) => {
-                  const done = allDone || i < activeStep
-                  const current = !allDone && i === activeStep
-                  return (
-                    <span key={i} className="relative z-10 flex h-[11px] w-[11px] items-center justify-center rounded-full border-2 bg-white"
-                      style={{
-                        borderColor: done ? 'transparent' : current ? 'var(--brand)' : 'rgba(0,0,0,0.1)',
-                        background: done ? (allDone ? '#34d399' : 'var(--brand)') : '#fff',
-                      }}
-                    >
-                      {current && <span className="h-[4px] w-[4px] animate-pulse rounded-full bg-[var(--brand)]" />}
-                    </span>
-                  )
-                })}
+                )
+              })}
+            </div>
+            <div className="mt-1.5 flex justify-between font-mono-code text-[8.5px] text-zinc-300">
+              <span>Dec 15</span><span>Dec 22</span><span>Dec 29</span>
+            </div>
+
+            {/* table */}
+            <div className="mt-5 overflow-hidden rounded-xl border border-black/[0.05]">
+              <div className="hidden grid-cols-[1fr_90px_110px_80px] gap-2 border-b border-black/[0.05] bg-[#fafaf9] px-3 py-2 text-[9px] font-bold uppercase tracking-[0.1em] text-zinc-400 sm:grid">
+                <span>Task</span><span>Repo</span><span>Status</span><span className="text-right">Changes</span>
               </div>
-
-              {/* terminal */}
-              <div className="mt-3 min-h-[74px] overflow-hidden rounded-xl bg-[var(--term-bg)] p-2.5 font-mono-code text-[9px] leading-relaxed">
-                {LOG_LINES.slice(0, stage >= 4 ? LOG_LINES.length : 0).map((l, i) => (
-                  <motion.p key={l.text} initial={{ opacity: 0, x: -6 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.28 }}>
-                    <span className={l.cls}>{l.text}</span>
-                  </motion.p>
-                ))}
-                {stage >= 3 && stage < 4 && (
-                  <p className="flex items-center gap-1.5 text-cyan-300">
-                    working<span className="term-caret" />
-                  </p>
-                )}
-              </div>
-
-              {/* diff + actions */}
-              <AnimatePresence>
-                {stage >= 5 && !allDone && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                    <div className="mt-3 flex items-center justify-between rounded-xl border border-[var(--warning)]/25 bg-[var(--warning-soft)] px-2.5 py-1.5">
-                      <span className="font-mono-code text-[9px] font-semibold text-[var(--foreground-secondary)]">1 file changed</span>
-                      <span className="font-mono-code text-[9px] font-bold"><span className="text-emerald-600">+12</span> <span className="text-red-500">−3</span></span>
-                    </div>
-                    <button className="btn-brand pressable mt-2 w-full rounded-xl py-2 text-[10px] font-bold">
-                      Review changes
-                    </button>
-                  </motion.div>
-                )}
-                {allDone && (
-                  <motion.div initial={{ scale: 0.94, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mt-3 flex items-center justify-center gap-1.5 rounded-xl bg-[var(--success-soft)] py-2 text-[10px] font-bold text-[var(--success)]">
-                    <GitPullRequest className="h-3 w-3" /> PR #42 opened — shipped safely
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {stage === 3 && (
-                <div className="mt-3 flex justify-center gap-1">
-                  <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+              {TASK_ROWS.map((r) => (
+                <div key={r.id} className="grid grid-cols-[1fr_auto] items-center gap-2 border-b border-black/[0.04] px-3 py-2 last:border-0 sm:grid-cols-[1fr_90px_110px_80px]">
+                  <span className="truncate font-mono-code text-[10.5px] text-zinc-600">{r.id}</span>
+                  <span className="hidden truncate text-[10.5px] text-zinc-400 sm:block">{r.repo}</span>
+                  <span className={`justify-self-end inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold sm:justify-self-start ${r.cls}`}>
+                    <i className={`h-1.5 w-1.5 rounded-full ${r.dot} ${r.live ? 'animate-pulse' : ''}`} />
+                    {r.status}
+                  </span>
+                  <span className="hidden text-right font-mono-code text-[10px] text-zinc-500 sm:block">{r.changes}</span>
                 </div>
-              )}
-            </motion.div>
-          )}
-        </div>
-
-        {/* composer hint */}
-        <div className="border-t border-black/5 px-3 py-2.5">
-          <div className="rounded-full border border-dashed border-black/10 px-3 py-2 text-[9px] text-[var(--muted-foreground)]">
-            Describe the change you want to make…
+              ))}
+            </div>
           </div>
         </div>
       </div>
+    </motion.div>
+  )
+}
 
-      {/* Floating chips */}
-      <motion.div
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-        className="absolute -left-14 top-16 hidden items-center gap-2 rounded-2xl border border-black/[0.07] bg-white/95 px-3 py-2 shadow-[var(--shadow-md)] backdrop-blur md:flex"
-      >
-        <CheckCircle2 className="h-3.5 w-3.5 text-[var(--success)]" />
-        <span className="text-[10px] font-bold">Build verified ✓</span>
-      </motion.div>
-      <motion.div
-        animate={{ y: [0, 9, 0] }}
-        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 0.7 }}
-        className="absolute -right-12 bottom-24 hidden items-center gap-1.5 rounded-full bg-[var(--term-bg)] px-3 py-2 shadow-lg md:flex"
-      >
-        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
-        <span className="font-mono-code text-[9px] text-slate-300">202 accepted</span>
-      </motion.div>
-
-      {/* Stage controls */}
-      <div className="mt-6 flex flex-col items-center gap-3">
-        <div className="flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-white px-2.5 py-2 shadow-[var(--shadow-sm)]">
-          {STAGE_LABELS.map((label, i) => (
-            <button
-              key={label}
-              onClick={() => jumpTo(i)}
-              title={label}
-              aria-label={`Jump to ${label}`}
-              className={`pressable h-2 w-6 rounded-full transition-colors duration-300 ${
-                stage === i + 1 || (stage === 6 && i === 5)
-                  ? 'bg-gradient-to-r from-[var(--brand)] to-[var(--cyan)]'
-                  : 'bg-black/10 hover:bg-black/20'
-              }`}
-            />
-          ))}
-        </div>
-        <div className="flex items-center gap-2">
-          <p className="font-mono-code text-[10px] text-[var(--muted-foreground)]">
-            {stage === 0 ? 'watch the flow →' : `${STAGE_LABELS[Math.min(stage, 6) - 1].toLowerCase()} · tap dots to jump`}
-          </p>
-          {stage >= 6 && (
-            <button onClick={replay} className="pressable rounded-full border border-black/10 bg-white px-2.5 py-1 text-[10px] font-bold text-[var(--brand)]">
-              ↺ replay
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
+/* ============================================================ */
+/* Sparkline                                                     */
+/* ============================================================ */
+function Sparkline({ points, stroke }: { points: string; stroke: string }) {
+  return (
+    <svg width="84" height="26" viewBox="0 0 84 26" fill="none">
+      <polyline points={points} stroke={stroke} strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="80" cy={points.trim().split(' ').pop()!.split(',')[1]} r="2.4" fill={stroke} />
+    </svg>
   )
 }
 
 /* ============================================================ */
 /* Landing                                                       */
 /* ============================================================ */
-const FEATURES = [
-  {
-    Icon: Zap,
-    title: 'Async by default',
-    copy: 'Your intent hits a durable Redis queue and returns in under 500ms. Close the app, lose signal, board a flight — the work continues.',
-  },
-  {
-    Icon: Terminal,
-    title: 'Deterministic tool-calls',
-    copy: 'The agent never free-writes files. It explores, reads and edits through auditable tools — every action streamed live to your screen.',
-  },
-  {
-    Icon: Hammer,
-    title: 'Self-healing builds',
-    copy: 'Compiler errors are fed straight back for bounded fix attempts. Only builds that pass tsc reach your review queue.',
-  },
-  {
-    Icon: ShieldCheck,
-    title: 'You hold the keys',
-    copy: 'Nothing ships without your explicit approval. Approve the diff and it lands as a pull request — never a direct push to main.',
-  },
-]
-
-const STEPS = [
-  { n: '01', title: 'Describe the change', copy: '"Fix the null check in checkout.ts" — plain language, any repo you own, typed from anywhere.' },
-  { n: '02', title: 'The daemon goes to work', copy: 'It clones, plans, edits via tool-calls and heals its own build errors on an isolated branch.' },
-  { n: '03', title: 'Review and ship', copy: 'A clean diff lands on your phone. One tap pushes the branch and opens the pull request.' },
-] as const
-
-const PROVIDERS = [
-  { Icon: SiOpenrouter, name: 'OpenRouter', desc: '400+ models · free tiers', color: '#6566f1', tint: 'rgba(101,102,241,0.1)' },
-  { Icon: SiGooglegemini, name: 'Gemini API', desc: 'Google AI Studio direct', color: '#0a66ff', tint: 'rgba(10,102,255,0.09)' },
-  { Icon: TbApi, name: 'Custom endpoint', desc: 'Any OpenAI-compatible URL', color: '#149e53', tint: 'rgba(20,158,83,0.09)' },
-]
-
 export function Landing() {
   const { signInWithGitHub } = useGitHubAuth()
-  const [scrolled, setScrolled] = useState(false)
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12)
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+  const githubBtn = (cls = 'btn-brand') => (
+    <button onClick={signInWithGitHub} className={`${cls} pressable inline-flex items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-bold`}>
+      <GithubIcon className="h-4 w-4" />
+      Start free with GitHub
+    </button>
+  )
 
   return (
-    <div className="min-h-screen bg-[#fbfbf9] text-[var(--foreground)] antialiased">
-      {/* ---------------- Nav ---------------- */}
-      <header
-        className={`sticky top-0 z-40 border-b transition-all duration-300 ${
-          scrolled ? 'border-black/[0.07] bg-[#fbfbf9]/90 shadow-[0_2px_20px_-8px_rgba(26,30,40,0.12)] backdrop-blur-xl' : 'border-transparent bg-transparent'
-        }`}
-      >
+    <div className="min-h-screen bg-[#ebebe8] text-[var(--foreground)] antialiased">
+      {/* ================= DARK HEADER ================= */}
+      <header className="sticky top-0 z-50 border-b border-white/[0.07] bg-[#14161c]/95 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
           <a href="#top" className="flex items-center gap-2.5">
-            <span className="relative h-8 w-8 overflow-hidden rounded-xl">
+            <span className="relative h-8 w-8 overflow-hidden rounded-xl ring-1 ring-white/15">
               <Image src="/logo.png" alt="WayCode logo" width={32} height={32} className="h-full w-full object-cover" />
             </span>
-            <span className="text-gradient-brand text-[17px] font-extrabold tracking-tight">WayCode</span>
+            <span className="text-[17px] font-extrabold tracking-tight text-white">WayCode</span>
           </a>
 
-          <nav className="hidden items-center gap-8 text-[13px] font-medium text-[var(--foreground-secondary)] md:flex">
-            <a href="#demo" className="nav-link transition-colors hover:text-[var(--foreground)]">Demo</a>
-            <a href="#features" className="nav-link transition-colors hover:text-[var(--foreground)]">Features</a>
-            <a href="#how" className="nav-link transition-colors hover:text-[var(--foreground)]">How it works</a>
-            <a href="#providers" className="nav-link transition-colors hover:text-[var(--foreground)]">Providers</a>
+          <nav className="hidden items-center gap-8 text-[13px] font-medium text-slate-400 md:flex">
+            <a href="#overview" className="nav-link transition-colors hover:text-white">Overview</a>
+            <a href="#features" className="nav-link transition-colors hover:text-white">Features</a>
+            <a href="#how" className="nav-link transition-colors hover:text-white">How it works</a>
+            <a href="#integrations" className="nav-link transition-colors hover:text-white">Integrations</a>
           </nav>
 
-          <button
-            onClick={signInWithGitHub}
-            className="btn-brand pressable flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-semibold"
-          >
-            <GithubIcon className="h-4 w-4" />
-            Sign in
-          </button>
+          <div className="flex items-center gap-4">
+            <button onClick={signInWithGitHub} className="hidden text-[13px] font-medium text-slate-400 transition-colors hover:text-white sm:block">
+              Log in
+            </button>
+            <button
+              onClick={signInWithGitHub}
+              className="pressable inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-[13px] font-bold text-[#14161c] transition-colors hover:bg-slate-200"
+            >
+              <GithubIcon className="h-4 w-4" />
+              Sign in
+            </button>
+          </div>
         </div>
       </header>
 
-      {/* ---------------- Hero ---------------- */}
-      <section id="top" className="hero-mesh relative overflow-hidden">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-14 px-5 pb-20 pt-14 sm:pt-20 lg:grid-cols-[1.02fr_0.98fr] lg:pb-28">
-          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease }}>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--brand)]/20 bg-white px-3 py-1.5 text-[11px] font-semibold tracking-wide text-[var(--brand)] shadow-[var(--shadow-sm)]">
-              <span className="live-dot" style={{ width: 6, height: 6 }} />
-              NOW IN PUBLIC BETA
-            </span>
+      {/* ================= SHEET ================= */}
+      <main className="mx-auto max-w-[1320px] sm:px-4 sm:pb-4">
+        <div className="overflow-hidden bg-white sm:rounded-b-[32px] sm:rounded-t-none">
+          {/* ---------- HERO ---------- */}
+          <section id="top" className="relative px-5 pb-16 pt-16 sm:pt-24">
+            <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(58%_60%_at_50%_0%,rgba(10,102,255,0.08),transparent_70%)]" />
 
-            <h1 className="mt-5 text-[40px] font-extrabold leading-[1.04] tracking-tight sm:text-[56px] lg:text-[64px]">
-              Ship code from{' '}
-              <span className="text-gradient-animated">anywhere.</span>
-            </h1>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease }} className="relative mx-auto max-w-3xl text-center">
+              <span className="inline-flex items-center gap-2 rounded-full border border-black/[0.08] bg-white px-4 py-1.5 text-[11px] font-semibold tracking-wide shadow-[var(--shadow-sm)]">
+                <span className="rounded-full bg-[var(--brand)] px-1.5 py-px text-[9px] font-extrabold text-white">NEW</span>
+                <span className="text-zinc-500">AUTONOMOUS ENGINEERING FOR GITHUB TEAMS</span>
+              </span>
 
-            <p className="mt-5 max-w-md text-[15px] leading-relaxed text-[var(--foreground-secondary)] sm:text-base">
-              WayCode turns your phone into a remote control for an autonomous engineering agent.
-              Describe the fix on your commute — review the finished diff before anything ships.
-            </p>
+              <h1 className="mx-auto mt-6 max-w-2xl text-[38px] font-extrabold leading-[1.05] tracking-tight sm:text-[56px] lg:text-[64px]">
+                Take control of your codebase from anywhere.
+              </h1>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-              <button
-                onClick={signInWithGitHub}
-                className="btn-brand pressable flex items-center justify-center gap-2 rounded-full px-7 py-3.5 text-sm font-bold"
-              >
-                <GithubIcon className="h-4 w-4" />
-                Start free with GitHub
-              </button>
-              <a
-                href="#demo"
-                className="pressable flex items-center justify-center gap-1.5 rounded-full border border-black/10 bg-white/80 px-6 py-3.5 text-sm font-semibold text-[var(--foreground-secondary)] backdrop-blur hover:border-[var(--brand)] hover:text-[var(--brand)]"
-              >
-                Watch it run
-                <ChevronDown className="h-4 w-4" />
-              </a>
+              <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-zinc-500 sm:text-base">
+                Dispatch engineering tasks in plain language. An autonomous agent clones, edits and verifies on its own branch —
+                and nothing ships until you approve the diff from your phone.
+              </p>
+
+              <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                {githubBtn()}
+                <a
+                  href="#overview"
+                  className="pressable inline-flex items-center justify-center gap-1.5 rounded-full border border-black/[0.12] bg-white px-6 py-3.5 text-sm font-semibold text-zinc-600 transition-colors hover:border-[var(--brand)] hover:text-[var(--brand)]"
+                >
+                  See how it works
+                </a>
+              </div>
+            </motion.div>
+
+            <div className="relative mx-auto mt-14 max-w-5xl sm:mt-20">
+              <AppWindowMockup />
             </div>
+          </section>
 
-            <p className="mt-6 font-mono-code text-[11px] text-[var(--muted-foreground)]">
-              free-tier models included · no credit card · your keys stay yours
+          {/* ---------- TECH STRIP ---------- */}
+          <section className="border-t border-black/[0.05] px-5 py-10">
+            <p className="text-center text-[11px] font-medium uppercase tracking-[0.14em] text-zinc-400">
+              Built entirely on the modern dev stack
             </p>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.8, delay: 0.15, ease }}
-            id="demo"
-          >
-            <PhoneDemo />
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ---------------- Log marquee ---------------- */}
-      <section aria-label="Live agent activity ticker" className="marquee overflow-hidden border-y border-black/[0.06] bg-[var(--term-bg)] py-3">
-        <div className="marquee-track flex w-max gap-8 pr-8">
-          {[...Array(2)].map((_, dup) => (
-            <div key={dup} className="flex shrink-0 gap-8" aria-hidden={dup === 1}>
+            <div className="mx-auto mt-6 flex max-w-3xl flex-wrap items-center justify-center gap-x-8 gap-y-5 sm:gap-x-12">
               {[
-                ['text-slate-500', '$ git clone --depth 1 ✓ 1.2s'],
-                ['text-sky-400', 'read_file src/api/checkout.ts'],
-                ['text-teal-400', 'edit_file src/api/checkout.ts +12 −3'],
-                ['text-emerald-400', 'tsc --noEmit ✓ 0 errors'],
-                ['text-amber-400', 'self-heal attempt 1/3 → TS2345 fixed'],
-                ['text-slate-500', 'git push origin waycode/task-a91f2c ✓'],
-                ['text-cyan-400', 'PR #42 opened → review requested'],
-                ['text-slate-500', '202 accepted · task queued in 84ms'],
-                ['text-sky-400', 'list_files → 214 files in scope'],
-                ['text-emerald-400', 'build verified · ready for review'],
-              ].map(([cls, text]) => (
-                <span key={`${dup}-${text}`} className={`whitespace-nowrap font-mono-code text-[11px] ${cls}`}>
-                  {text}
+                ['github', 'GitHub'],
+                ['typescript', 'TypeScript'],
+                ['nextjs', 'Next.js'],
+                ['tailwindcss', 'Tailwind'],
+                ['redis', 'Redis'],
+                ['supabase', 'Supabase'],
+                ['vercel', 'Vercel'],
+                ['docker', 'Docker'],
+              ].map(([slug, name]) => (
+                <span key={slug} title={name} className="opacity-40 grayscale transition-all duration-300 hover:scale-110 hover:opacity-100 hover:grayscale-0">
+                  <DevIcon slug={slug} className="h-7 w-7 object-contain sm:h-8 sm:w-8" />
                 </span>
               ))}
             </div>
-          ))}
-        </div>
-      </section>
+          </section>
 
-      {/* ---------------- Stats ---------------- */}
-      <section className="border-b border-black/[0.06] bg-white">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-y-10 px-5 py-12 lg:grid-cols-4">
-          {[
-            { big: <Counter to={500} prefix="<" suffix="ms" />, small: 'acknowledgment, p95' },
-            { big: <Counter to={100} suffix="%" />, small: 'continuity on disconnect' },
-            { big: <Counter to={3} suffix="×" />, small: 'bounded self-heal attempts' },
-            { big: <Counter to={24} suffix="/7" />, small: 'daemon uptime target' },
-          ].map((s) => (
-            <div key={s.small} className="text-center">
-              <p className="text-gradient-brand text-[30px] font-extrabold tracking-tight sm:text-[38px]">{s.big}</p>
-              <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.08em] text-[var(--muted-foreground)]">{s.small}</p>
+          {/* ---------- OVERVIEW ---------- */}
+          <section id="overview" className="scroll-mt-24 border-t border-black/[0.05] px-5 py-20 sm:py-28">
+            <div className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-12 lg:grid-cols-2">
+              <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.6, ease }}>
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[var(--brand)]">Overview</p>
+                <h2 className="mt-4 max-w-md text-3xl font-extrabold leading-tight tracking-tight sm:text-4xl">
+                  Every task runs in the open — clone, edit, verify, wait for <em className="not-italic text-[var(--brand)]">you</em>.
+                </h2>
+                <p className="mt-4 max-w-md text-sm leading-relaxed text-zinc-500">
+                  The daemon streams every tool-call and compiler line to your screen in real time. You see exactly what the
+                  agent did — and only a build that passes reaches your review queue.
+                </p>
+                <div className="mt-7">{githubBtn('bg-[#14161c] text-white shadow-[0_10px_30px_-10px_rgba(20,22,28,0.5)] hover:bg-[#23262e]')}</div>
+              </motion.div>
+
+              {/* alert cards */}
+              <motion.div initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.7, ease }} className="relative hidden min-h-[260px] lg:block">
+                <div aria-hidden className="absolute inset-x-8 bottom-0 top-8 rotate-[5deg] rounded-2xl border border-black/[0.06] bg-white shadow-sm" />
+                <div className="absolute inset-x-0 top-0 -rotate-2 rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_30px_60px_-25px_rgba(26,30,40,0.3)]">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[13px] font-bold">Dec 28, 2026 · 06:12</p>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2 py-0.5 text-[9px] font-extrabold tracking-wide text-red-500">
+                      <i className="h-1.5 w-1.5 rounded-full bg-red-500" /> OVERNIGHT DIGEST
+                    </span>
+                  </div>
+                  <p className="mt-3 text-[15px] font-bold">Overnight run summary</p>
+                  <p className="mt-1 text-[12px] leading-relaxed text-zinc-500">
+                    3 tasks completed across 2 repositories — zero failures, nothing pushed without you.
+                  </p>
+                  <div className="mt-4 space-y-1.5 border-t border-black/[0.05] pt-3 font-mono-code text-[10.5px]">
+                    <p className="flex items-center justify-between"><span className="text-zinc-500">waycode/task-a91f2c</span><span className="font-semibold text-emerald-600">✓ shipped → PR #41</span></p>
+                    <p className="flex items-center justify-between"><span className="text-zinc-500">waycode/task-7c3d9e</span><span className="font-semibold text-amber-600">● awaiting review</span></p>
+                    <p className="flex items-center justify-between"><span className="text-zinc-500">waycode/task-b52f08</span><span className="font-semibold text-emerald-600">✓ build verified</span></p>
+                  </div>
+                </div>
+              </motion.div>
             </div>
-          ))}
-        </div>
-      </section>
 
-      {/* ---------------- Features ---------------- */}
-      <section id="features" className="scroll-mt-24 bg-gradient-to-b from-white via-[#f4f8ff] to-[#fffdf6] py-20 sm:py-28">
-        <div className="mx-auto max-w-6xl px-5">
-          <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.6, ease }} className="mx-auto max-w-xl text-center">
-            <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--brand)]">Features</p>
-            <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Built like infrastructure,<br className="hidden sm:block" /> not a chatbot.</h2>
-            <p className="mt-3 text-sm leading-relaxed text-[var(--foreground-secondary)]">
-              Every layer is designed around one promise: your work is durable, legible, and always under your control.
-            </p>
-          </motion.div>
+            {/* stat cards */}
+            <div className="mx-auto mt-14 grid max-w-5xl grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                { label: 'Median time-to-review', value: '3m 42s', delta: '▼ 41%', deltaCls: 'text-emerald-600 bg-emerald-50', points: '2,20 14,17 26,18.5 38,13 50,14 62,9 76,10 80,6', stroke: '#149e53' },
+                { label: 'Self-heal recovery rate', value: '87%', delta: '▲ 6pts', deltaCls: 'text-emerald-600 bg-emerald-50', points: '2,21 14,19 26,15 38,16 50,11 62,12 76,7 80,5', stroke: '#0a66ff' },
+                { label: 'Tasks shipped this month', value: '1,204', delta: '▲ 22%', deltaCls: 'text-emerald-600 bg-emerald-50', points: '2,22 14,20 26,17 38,15 50,13 62,10 76,8 80,4', stroke: '#00b7e8' },
+                { label: 'Daemon uptime', value: '99.98%', delta: 'SLA', deltaCls: 'text-zinc-500 bg-zinc-100', points: '2,14 14,13.5 26,14 38,13 50,13.5 62,13 76,13.5 80,13', stroke: '#a1a1aa' },
+              ].map((s, i) => (
+                <motion.div
+                  key={s.label}
+                  initial={{ opacity: 0, y: 16 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-40px' }}
+                  transition={{ duration: 0.5, delay: i * 0.07, ease }}
+                  className="rounded-2xl border border-black/[0.06] bg-white p-4"
+                >
+                  <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-zinc-400">{s.label}</p>
+                  <div className="mt-1.5 flex items-end justify-between gap-2">
+                    <div>
+                      <p className="text-[24px] font-extrabold tracking-tight">{s.value}</p>
+                      <span className={`mt-1 inline-block rounded-full px-1.5 py-px text-[9px] font-bold ${s.deltaCls}`}>{s.delta}</span>
+                    </div>
+                    <Sparkline points={s.points} stroke={s.stroke} />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </section>
 
-          <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {FEATURES.map((f, i) => (
-              <GlowCard key={f.title} {...f} index={i} />
-            ))}
-          </div>
-        </div>
-      </section>
+          {/* ---------- FEATURES BENTO ---------- */}
+          <section id="features" className="scroll-mt-24 border-t border-black/[0.05] bg-[#fbfbfa] px-5 py-20 sm:py-28">
+            <div className="mx-auto max-w-5xl">
+              <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.6, ease }} className="mx-auto max-w-xl text-center">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[var(--brand)]">Features</p>
+                <h2 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">An agent you can audit,<br className="hidden sm:block" /> not a black box.</h2>
+              </motion.div>
 
-      {/* ---------------- How it works ---------------- */}
-      <section id="how" className="scroll-mt-24 bg-white py-20 sm:py-28">
-        <div className="mx-auto max-w-6xl px-5">
-          <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
-            <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.6, ease }}>
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--brand)]">How it works</p>
-              <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Three taps between idea<br className="hidden sm:block" /> and pull request.</h2>
+              <div className="mt-12 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                {/* Async — wide */}
+                <motion.article initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.55, ease }} className="card-surface rounded-[24px] p-6 lg:col-span-2">
+                  <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                    <div className="sm:w-2/5">
+                      <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] text-white shadow-[0_6px_18px_-6px_var(--brand-glow)]">
+                        <Zap className="h-5 w-5" />
+                      </span>
+                      <h3 className="mt-4 text-[16px] font-bold">Async by default</h3>
+                      <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-500">Durable Redis queue, HTTP 202 in under 500ms. Lose signal, close the tab — the work continues.</p>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      {[
+                        { id: 'task-a91f2c', repo: 'Skillvault-047', chip: 'verified', cls: 'bg-emerald-50 text-emerald-600' },
+                        { id: 'task-7c3d9e', repo: 'GramaVoice', chip: 'running', cls: 'bg-blue-50 text-blue-600', live: true },
+                        { id: 'task-b52f08', repo: 'AswinSaii', chip: 'queued · 84ms', cls: 'bg-zinc-100 text-zinc-500' },
+                      ].map((q) => (
+                        <div key={q.id} className="flex items-center justify-between rounded-xl border border-black/[0.05] bg-white px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="truncate font-mono-code text-[10.5px] text-zinc-600">waycode/{q.id}</p>
+                            <p className="text-[10px] text-zinc-400">{q.repo}</p>
+                          </div>
+                          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold ${q.cls}`}>
+                            {q.live && <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />} {q.chip}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </motion.article>
 
-              <div className="relative mt-10 space-y-8 before:absolute before:bottom-2 before:left-[13px] before:top-2 before:w-px before:bg-gradient-to-b before:from-[var(--brand)] before:via-[var(--cyan)] before:to-transparent">
-                {STEPS.map((s) => (
-                  <motion.div key={s.n} initial={{ opacity: 0, x: -14 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.5, ease }} className="relative flex gap-5 pl-0">
-                    <span className="relative z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] text-[10px] font-extrabold text-white shadow-[0_4px_12px_-3px_var(--brand-glow)]">
+                {/* Tool-calls */}
+                <motion.article initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.55, delay: 0.08, ease }} className="card-surface rounded-[24px] p-6">
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] text-white shadow-[0_6px_18px_-6px_var(--brand-glow)]">
+                    <Terminal className="h-5 w-5" />
+                  </span>
+                  <h3 className="mt-4 text-[16px] font-bold">Deterministic tool-calls</h3>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-500">No free-form file writes — every change goes through auditable tools.</p>
+                  <div className="mt-4 space-y-1.5 rounded-xl bg-[var(--term-bg)] p-3 font-mono-code text-[10px]">
+                    <p className="text-sky-300">read_file src/api/checkout.ts</p>
+                    <p className="text-teal-300">edit_file src/api/checkout.ts <span className="text-slate-400">+18 −4</span></p>
+                    <p className="text-slate-400">list_files → 214 entries</p>
+                  </div>
+                </motion.article>
+
+                {/* Self-heal */}
+                <motion.article initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.55, ease }} className="card-surface rounded-[24px] p-6">
+                  <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] text-white shadow-[0_6px_18px_-6px_var(--brand-glow)]">
+                    <Hammer className="h-5 w-5" />
+                  </span>
+                  <h3 className="mt-4 text-[16px] font-bold">Self-healing builds</h3>
+                  <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-500">Compiler errors feed straight back for bounded fix attempts.</p>
+                  <div className="mt-4 space-y-1.5 font-mono-code text-[10px]">
+                    <p className="rounded-lg bg-red-50 px-2.5 py-1.5 text-red-500">✗ TS2345: &apos;string&apos; not assignable</p>
+                    <p className="text-center text-zinc-300">↓ self-heal 1/3</p>
+                    <p className="rounded-lg bg-emerald-50 px-2.5 py-1.5 text-emerald-600">✓ tsc --noEmit · 0 errors</p>
+                  </div>
+                </motion.article>
+
+                {/* Approval — wide */}
+                <motion.article initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.55, delay: 0.08, ease }} className="card-surface rounded-[24px] p-6 lg:col-span-2">
+                  <div className="flex flex-col gap-6 sm:flex-row sm:items-center">
+                    <div className="sm:w-2/5">
+                      <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] text-white shadow-[0_6px_18px_-6px_var(--brand-glow)]">
+                        <ShieldCheck className="h-5 w-5" />
+                      </span>
+                      <h3 className="mt-4 text-[16px] font-bold">Human-approved pushes</h3>
+                      <p className="mt-1.5 text-[13px] leading-relaxed text-zinc-500">Review the unified diff, tap once — the branch lands as a pull request. Never a silent push to main.</p>
+                    </div>
+                    <div className="flex-1 rounded-2xl border border-black/[0.05] bg-white p-4">
+                      <div className="flex items-center justify-between font-mono-code text-[10.5px]">
+                        <span className="font-semibold text-zinc-600">checkout.ts</span>
+                        <span><span className="text-emerald-600">+18</span> <span className="text-red-500">−4</span></span>
+                      </div>
+                      <div className="mt-2.5 space-y-1 font-mono-code text-[9.5px]">
+                        <p className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-700">+ if (cart?.items?.length) &#123;&#125;</p>
+                        <p className="rounded bg-red-50 px-2 py-0.5 text-red-500">− if (cart.items.length) &#123;&#125;</p>
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <span className="flex-1 rounded-full border border-black/[0.1] py-1.5 text-center text-[10px] font-bold text-zinc-500">Reject</span>
+                        <span className="btn-brand flex-1 rounded-full py-1.5 text-center text-[10px] font-bold">Approve &amp; push</span>
+                      </div>
+                    </div>
+                  </div>
+                </motion.article>
+              </div>
+            </div>
+          </section>
+
+          {/* ---------- HOW IT WORKS ---------- */}
+          <section id="how" className="scroll-mt-24 border-t border-black/[0.05] px-5 py-20 sm:py-28">
+            <div className="mx-auto max-w-5xl">
+              <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.6, ease }} className="max-w-xl">
+                <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[var(--brand)]">How it works</p>
+                <h2 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">Three taps between idea<br className="hidden sm:block" /> and pull request.</h2>
+              </motion.div>
+
+              <div className="relative mt-12 space-y-9 before:absolute before:bottom-3 before:left-[15px] before:top-3 before:w-px before:bg-gradient-to-b before:from-[var(--brand)] before:via-[var(--cyan)] before:to-transparent">
+                {[
+                  { n: '01', t: 'Describe the change', c: '"Fix the null check in checkout.ts" — plain language, any repo you own.' },
+                  { n: '02', t: 'The daemon goes to work', c: 'It clones, plans, edits through tool-calls and heals its own build errors on an isolated waycode/task-* branch.' },
+                  { n: '03', t: 'Review and ship', c: 'A clean diff lands on your phone. Approve it and WayCode pushes the branch and opens the pull request.' },
+                ].map((s, i) => (
+                  <motion.div key={s.n} initial={{ opacity: 0, x: -16 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.5, delay: i * 0.1, ease }} className="relative flex gap-5">
+                    <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] text-[11px] font-extrabold text-white shadow-[0_6px_16px_-4px_var(--brand-glow)]">
                       {s.n.slice(1)}
                     </span>
-                    <div>
-                      <h3 className="text-[15px] font-bold">{s.title}</h3>
-                      <p className="mt-1 max-w-sm text-[13px] leading-relaxed text-[var(--foreground-secondary)]">{s.copy}</p>
+                    <div className="pt-0.5">
+                      <h3 className="text-[15px] font-bold">{s.t}</h3>
+                      <p className="mt-1 max-w-lg text-[13px] leading-relaxed text-zinc-500">{s.c}</p>
                     </div>
                   </motion.div>
                 ))}
               </div>
+            </div>
+          </section>
+
+          {/* ---------- INTEGRATIONS ---------- */}
+          <section id="integrations" className="scroll-mt-24 overflow-hidden border-t border-black/[0.05] bg-[#fbfbfa] px-5 py-20 sm:py-28">
+            <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.6, ease }} className="mx-auto max-w-xl text-center">
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.16em] text-[var(--brand)]">Integrations</p>
+              <h2 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl">Plugs into the stack you already use.</h2>
+              <p className="mt-3 text-sm leading-relaxed text-zinc-500">
+                GitHub OAuth with least-privilege scopes, encrypted BYOK for any model provider, Supabase Realtime telemetry.
+              </p>
             </motion.div>
 
-            <motion.div initial={{ opacity: 0, scale: 0.97 }} whileInView={{ opacity: 1, scale: 1 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.7, ease }} className="relative aspect-[4/5] overflow-hidden rounded-[28px] border border-black/[0.07] shadow-[var(--shadow-lg)] sm:aspect-[4/3.6]">
-              <Image src={WORK_IMG} alt="Working from a phone, anywhere" fill sizes="(max-width: 1024px) 100vw, 46vw" className="object-cover" />
-              <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-[rgba(16,20,28,0.5)] via-transparent to-transparent" />
-              <div className="absolute bottom-5 left-5 right-5 rounded-2xl bg-white/92 p-4 backdrop-blur">
-                <p className="font-mono-code text-[10px] font-semibold text-[var(--brand)]">FROM ANYWHERE</p>
-                <p className="mt-1 text-[13px] font-bold">Commuting? In a meeting? The daemon already opened the branch.</p>
+            <div className="relative mx-auto mt-14 h-[320px] max-w-3xl sm:h-[380px]">
+              {/* connecting lines */}
+              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 h-full w-full" aria-hidden>
+                {[
+                  [12, 10], [31, 10], [50, 10], [69, 10], [88, 10],
+                  [18, 86], [39.3, 86], [60.7, 86], [82, 86],
+                ].map(([x, y], i) => (
+                  <line key={i} x1={x} y1={y} x2="50" y2="48" stroke="#d9d9d6" strokeWidth="0.3" />
+                ))}
+              </svg>
+
+              {/* top nodes */}
+              {[
+                { slug: 'github', x: 12, y: 10, hide: false },
+                { slug: 'typescript', x: 31, y: 10, hide: false },
+                { slug: 'nextjs', x: 50, y: 10, hide: false },
+                { slug: 'tailwindcss', x: 69, y: 10, hide: false },
+                { slug: 'vercel', x: 88, y: 10, hide: false },
+              ].map((n) => (
+                <span
+                  key={n.slug}
+                  style={{ left: `${n.x}%`, top: `${n.y}%` }}
+                  className="absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-black/[0.07] bg-white shadow-[0_10px_28px_-12px_rgba(26,30,40,0.3)] sm:h-14 sm:w-14"
+                  title={n.slug}
+                >
+                  <DevIcon slug={n.slug} className="h-5 w-5 object-contain sm:h-6 sm:w-6" />
+                </span>
+              ))}
+
+              {/* bottom nodes */}
+              {[
+                { slug: 'redis', x: 18, y: 86 },
+                { slug: 'supabase', x: 39.3, y: 86 },
+                { slug: 'docker', x: 60.7, y: 86 },
+                { slug: 'github', x: 82, y: 86, alt: 'github' },
+              ].slice(0, 4).map((n, i) => (
+                <span
+                  key={n.slug + i}
+                  style={{ left: `${n.x}%`, top: `${n.y}%` }}
+                  className={`absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-black/[0.07] bg-white shadow-[0_10px_28px_-12px_rgba(26,30,40,0.3)] sm:h-14 sm:w-14 ${i === 1 || i === 2 ? '' : 'hidden sm:flex'}`}
+                  title={n.slug}
+                >
+                  <DevIcon slug={n.slug === 'github' && n.alt ? 'vercel' : n.slug} className="h-5 w-5 object-contain sm:h-6 sm:w-6" />
+                </span>
+              ))}
+
+              {/* center node */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.85 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.3, duration: 0.5, ease }}
+                style={{ left: '50%', top: '48%' }}
+                className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2 rounded-2xl bg-[#14161c] px-4 py-3 shadow-[0_24px_50px_-18px_rgba(20,22,28,0.6)] ring-1 ring-white/10"
+              >
+                <Image src="/logo.png" alt="" width={22} height={22} className="rounded-md" />
+                <span className="text-[13px] font-extrabold text-white">WayCode</span>
+              </motion.div>
+            </div>
+          </section>
+
+          {/* ---------- PERSONAS ---------- */}
+          <section className="border-t border-black/[0.05] px-5 py-20 sm:py-28">
+            <div className="mx-auto max-w-5xl">
+              <motion.p initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, ease }} className="max-w-lg text-[15px] font-semibold leading-snug">
+                See how developers use WayCode to ship faster, stay unblocked, <span className="text-[var(--brand)]">and keep humans in control</span>.
+              </motion.p>
+              <div className="mt-12 grid grid-cols-1 gap-10 md:grid-cols-3">
+                {[
+                  { who: 'THE ASYNC MAINTAINER', what: 'Clears the issue backlog between meetings — triage, fixes and dependency bumps without opening a laptop.' },
+                  { who: 'SOLO FOUNDERS', what: 'Ships landing tweaks from the beach. The daemon handles clone, build and PR while they stay in flow elsewhere.' },
+                  { who: 'ENGINEERING MANAGERS', what: 'Full audit trail of every autonomous change — who approved what, when, with the complete log stream attached.' },
+                ].map((p, i) => (
+                  <motion.div key={p.who} initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.55, delay: i * 0.09, ease }}>
+                    <ChevronRight className="h-4 w-4 text-[var(--brand)]" />
+                    <p className="mt-3 text-[15px] font-extrabold tracking-wide">{p.who}</p>
+                    <p className="mt-2 text-[13px] leading-relaxed text-zinc-500">{p.what}</p>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* ---------- QUOTE ---------- */}
+          <section className="border-t border-black/[0.05] px-5 py-24 text-center">
+            <motion.blockquote initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, ease }} className="mx-auto max-w-2xl">
+              <p className="text-[22px] font-semibold leading-snug tracking-tight sm:text-[27px]">
+                “Nothing is lost. Nothing ships silently.”
+              </p>
+              <footer className="mt-4 text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">
+                The two guarantees WayCode runs on
+              </footer>
+            </motion.blockquote>
+          </section>
+
+          {/* ---------- CTA ---------- */}
+          <section className="px-5 pb-16">
+            <motion.div
+              initial={{ opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: '-80px' }}
+              transition={{ duration: 0.7, ease }}
+              className="mx-auto grid max-w-5xl grid-cols-1 items-center gap-10 rounded-[32px] border border-black/[0.05] bg-gradient-to-br from-[#eaf1ff] via-white to-[#fff6ea] p-8 sm:p-14 lg:grid-cols-2"
+            >
+              <div>
+                <h2 className="text-3xl font-extrabold tracking-tight sm:text-[44px] sm:leading-[1.08]">
+                  Get started in <span className="text-[var(--brand)]">minutes,</span><br />
+                  <span className="text-zinc-400">not months.</span>
+                </h2>
+                <p className="mt-4 max-w-sm text-sm leading-relaxed text-zinc-500">
+                  Connect GitHub, bring your own key — free-tier models work out of the box — and dispatch your first task today.
+                </p>
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                  {githubBtn('bg-[#14161c] text-white shadow-[0_10px_30px_-10px_rgba(20,22,28,0.5)] hover:bg-[#23262e]')}
+                </div>
+                <p className="mt-5 inline-flex items-center gap-2 text-[11px] font-semibold text-zinc-400">
+                  <Lock className="h-3 w-3" /> AES-256-GCM key vault · never returned in plaintext
+                </p>
+              </div>
+
+              <div className="rotate-1 rounded-2xl border border-black/[0.06] bg-white p-5 shadow-[0_40px_80px_-30px_rgba(26,30,40,0.35)]">
+                <div className="flex items-center justify-between">
+                  <p className="text-[12px] font-bold">Agent · Skillvault-047</p>
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-bold text-emerald-600">SHIPPED</span>
+                </div>
+                <div className="mt-3 flex items-center justify-between gap-2">
+                  {[0, 1, 2, 3].map((i) => (
+                    <span key={i} className="flex flex-1 items-center gap-1.5">
+                      <i className={`h-2.5 w-2.5 rounded-full ${i < 3 ? 'bg-emerald-400' : 'bg-zinc-200'}`} />
+                      <i className={`h-1 flex-1 rounded-full ${i < 3 ? 'bg-gradient-to-r from-[var(--brand)] to-[var(--cyan)]' : 'bg-transparent'}`} />
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center justify-between font-mono-code text-[10px] text-zinc-400">
+                  <span>queued → generating → verifying → review</span>
+                </div>
+                <div className="mt-4 rounded-xl border border-black/[0.05] p-3">
+                  <div className="flex items-center justify-between font-mono-code text-[10px]">
+                    <span className="text-zinc-500">README.md</span>
+                    <span><span className="text-emerald-600">+12</span> <span className="text-red-500">−2</span></span>
+                  </div>
+                  <p className="mt-2 rounded bg-emerald-50 px-2 py-0.5 font-mono-code text-[9.5px] text-emerald-700">+ [![Built with WayCode]](…)</p>
+                </div>
               </div>
             </motion.div>
-          </div>
+          </section>
         </div>
-      </section>
+      </main>
 
-      {/* ---------------- Providers / BYOK ---------------- */}
-      <section id="providers" className="scroll-mt-24 bg-gradient-to-b from-[#fffdf6] via-white to-[#f4f8ff] py-20 sm:py-28">
-        <div className="mx-auto max-w-6xl px-5">
-          <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-[0.9fr_1.1fr]">
-            <motion.div initial={{ opacity: 0, y: 18 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-80px' }} transition={{ duration: 0.6, ease }}>
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--brand)]">Bring your own key</p>
-              <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Any model. Zero markup.</h2>
-              <p className="mt-4 max-w-md text-sm leading-relaxed text-[var(--foreground-secondary)]">
-                Paste your provider key, run the built-in connection test, save — done. Keys are encrypted at rest
-                and decrypted only inside the daemon at call time.
+      {/* ================= DARK FOOTER ================= */}
+      <footer className="bg-[#14161c] text-slate-400">
+        <div className="mx-auto max-w-6xl px-5 py-14">
+          <div className="grid grid-cols-2 gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+            <div className="col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2.5">
+                <span className="relative h-8 w-8 overflow-hidden rounded-xl ring-1 ring-white/15">
+                  <Image src="/logo.png" alt="" width={32} height={32} className="h-full w-full object-cover" />
+                </span>
+                <span className="text-[16px] font-extrabold text-white">WayCode</span>
+              </div>
+              <p className="mt-3 max-w-[220px] text-[12px] leading-relaxed">
+                An async gateway between your phone and an autonomous engineering agent.
               </p>
-              <p className="mt-5 inline-flex items-center gap-2 rounded-full border border-[var(--success)]/25 bg-[var(--success-soft)] px-3.5 py-2 text-[11px] font-semibold text-[var(--success)]">
-                <Lock className="h-3.5 w-3.5" />
-                AES-256-GCM encrypted · never returned in plaintext
-              </p>
-            </motion.div>
-
-            <div className="space-y-3">
-              {PROVIDERS.map((p, i) => (
-                <motion.div
-                  key={p.name}
-                  initial={{ opacity: 0, x: 22 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true, margin: '-60px' }}
-                  transition={{ duration: 0.5, delay: i * 0.1, ease }}
-                  className="card-surface flex items-center gap-4 rounded-[22px] p-4 sm:p-5"
-                >
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl" style={{ background: p.tint }}>
-                    <p.Icon className="h-6 w-6" style={{ color: p.color }} />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-bold">{p.name}</p>
-                    <p className="truncate text-[12px] text-[var(--muted-foreground)]">{p.desc}</p>
-                  </div>
-                  <CheckCircle2 className="h-5 w-5 shrink-0 text-[var(--success)]" />
-                </motion.div>
-              ))}
+              <span className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/10 px-3 py-1.5 text-[10px] font-semibold">
+                <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" /> All systems operational
+              </span>
             </div>
-          </div>
-        </div>
-      </section>
 
-      {/* ---------------- CTA band ---------------- */}
-      <section className="px-5 pb-24 pt-20">
-        <motion.div
-          initial={{ opacity: 0, y: 22 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ duration: 0.65, ease }}
-          className="relative mx-auto max-w-6xl overflow-hidden rounded-[36px] bg-[var(--chrome-bg)] px-6 py-16 text-center sm:py-20"
-        >
-          <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_75%_at_50%_120%,rgba(10,102,255,0.4),transparent_70%),radial-gradient(35%_45%_at_85%_-10%,rgba(0,183,232,0.18),transparent_70%)]" />
-          <div className="relative">
-            <h2 className="mx-auto max-w-xl text-3xl font-extrabold tracking-tight text-white sm:text-[42px] sm:leading-tight">
-              Your next fix is one<br className="hidden sm:block" /> message away.
-            </h2>
-            <p className="mx-auto mt-4 max-w-md text-sm leading-relaxed text-slate-400">
-              Connect GitHub, bring your own key — free tiers work out of the box — and dispatch your first task in under two minutes.
-            </p>
-            <button
-              onClick={signInWithGitHub}
-              className="pressable mx-auto mt-9 flex items-center gap-2 rounded-full bg-white px-8 py-4 text-sm font-bold text-[#14161c] shadow-[0_10px_40px_-10px_rgba(255,255,255,0.4)] hover:bg-slate-200"
+            {[
+              { h: 'PRODUCT', links: [['Features', '#features'], ['How it works', '#how'], ['Integrations', '#integrations'], ['Overview', '#overview']] },
+              { h: 'RESOURCES', links: [['Documentation', '#top'], ['Changelog', '#top'], ['Status', '#top']] },
+              { h: 'COMPANY', links: [['About', '#top'], ['Contact support', '#top'], ['Privacy', '#top']] },
+            ].map((col) => (
+              <div key={col.h}>
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.14em] text-slate-500">{col.h}</p>
+                <ul className="mt-4 space-y-2.5 text-[13px]">
+                  {col.links.map(([label, href]) => (
+                    <li key={label}>
+                      <a href={href} className="transition-colors hover:text-white">{label}</a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/[0.08] pt-6 sm:flex-row">
+            <p className="text-[11px]">© 2026 WayCode · All rights reserved</p>
+            <a
+              href="https://github.com/Aswinsaipalakonda/WayCode"
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 text-slate-300 transition-colors hover:border-white/30 hover:text-white"
+              aria-label="GitHub repository"
             >
               <GithubIcon className="h-4 w-4" />
-              Start building free
-            </button>
-            <p className="mt-6 font-mono-code text-[11px] text-slate-500">OpenRouter · Gemini · Custom endpoints — BYOK</p>
+            </a>
           </div>
-        </motion.div>
-      </section>
-
-      {/* ---------------- Footer ---------------- */}
-      <footer className="border-t border-black/[0.06] py-8">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 sm:flex-row">
-          <div className="flex items-center gap-2">
-            <Image src="/logo.png" alt="" width={22} height={22} className="rounded-md" />
-            <span className="text-[13px] font-bold">WayCode</span>
-          </div>
-          <p className="text-center text-[11px] text-[var(--muted-foreground)]">Async engineering, human-approved. © 2026 WayCode</p>
-          <a
-            href="https://github.com/Aswinsaipalakonda/WayCode"
-            target="_blank"
-            rel="noreferrer"
-            className="text-[11px] font-medium text-[var(--muted-foreground)] transition-colors hover:text-[var(--foreground)]"
-          >
-            GitHub →
-          </a>
         </div>
       </footer>
     </div>
