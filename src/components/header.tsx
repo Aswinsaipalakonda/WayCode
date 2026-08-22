@@ -17,15 +17,12 @@ interface HeaderProps {
     }
   } | null
   onMenuClick?: () => void
-  /** 'blend' — transparent over the chat scene · 'dark' — dark chrome bar */
-  variant?: 'blend' | 'dark'
 }
 
-export function Header({ user, onMenuClick, variant = 'dark' }: HeaderProps) {
+export function Header({ user, onMenuClick }: HeaderProps) {
   const { signInWithGitHub } = useGitHubAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement>(null)
-  const blend = variant === 'blend'
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -36,30 +33,20 @@ export function Header({ user, onMenuClick, variant = 'dark' }: HeaderProps) {
   }, [])
 
   return (
-    <header
-      className={`sticky top-0 z-40 h-14 w-full px-2 flex items-center justify-between ${
-        blend
-          ? 'bg-transparent'
-          : 'border-b border-[var(--chrome-border)] bg-[rgba(20,22,28,0.92)] backdrop-blur-xl'
-      }`}
-    >
+    <header className="sticky top-0 z-40 h-14 w-full border-b border-[var(--chrome-border)] bg-[rgba(20,22,28,0.94)] px-2 flex items-center justify-between backdrop-blur-xl">
       {/* Left: hamburger + brand */}
       <div className="flex items-center gap-1 min-w-0">
         <button
           onClick={onMenuClick}
           aria-label="Open menu"
-          className={`pressable p-2.5 rounded-full ${
-            blend
-              ? 'text-[var(--foreground-secondary)] hover:bg-black/5 hover:text-[var(--foreground)]'
-              : 'text-[var(--chrome-text-secondary)] hover:bg-white/8 hover:text-[var(--chrome-text)]'
-          }`}
+          className="pressable p-2.5 rounded-full text-[var(--chrome-text-secondary)] hover:bg-white/8 hover:text-[var(--chrome-text)]"
         >
           <Menu className="h-5 w-5" />
         </button>
 
         <Link href="/" className="flex items-center gap-2 pl-1 group">
           <span className="relative w-7 h-7 rounded-lg bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] p-[1.5px] shadow-[0_1px_10px_-2px_var(--brand-glow)] transition-transform duration-300 group-hover:scale-105 group-active:scale-95">
-            <span className={`flex w-full h-full items-center justify-center rounded-[7px] ${blend ? 'bg-white' : 'bg-[#1d2027]'}`}>
+            <span className="flex w-full h-full items-center justify-center rounded-[7px] bg-[#1d2027]">
               <Image src="/logo.png" alt="" width={16} height={16} className="object-contain" />
             </span>
           </span>
@@ -85,10 +72,10 @@ export function Header({ user, onMenuClick, variant = 'dark' }: HeaderProps) {
                   alt=""
                   width={32}
                   height={32}
-                  className="rounded-full border border-black/10"
+                  className="rounded-full border border-white/15"
                 />
               ) : (
-                <span className="w-8 h-8 rounded-full btn-brand flex items-center justify-center text-xs font-bold">
+                <span className="w-8 h-8 rounded-full btn-brand flex items-center justify-center text-xs font-bold text-white">
                   {user.email?.[0]?.toUpperCase() ?? 'U'}
                 </span>
               )}
@@ -97,6 +84,7 @@ export function Header({ user, onMenuClick, variant = 'dark' }: HeaderProps) {
             <AnimatePresence>
               {menuOpen && (
                 <motion.div
+                  key="profile-menu"
                   initial={{ opacity: 0, y: -6, scale: 0.96 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.96 }}
@@ -141,9 +129,9 @@ export function Header({ user, onMenuClick, variant = 'dark' }: HeaderProps) {
           <button
             onClick={signInWithGitHub}
             title="Sign in with GitHub"
-            className={`btn-brand pressable flex items-center gap-2 rounded-full pl-3 pr-4 py-2 text-[13px] font-semibold mr-1`}
+            className="btn-brand pressable flex items-center gap-2 rounded-full pl-3 pr-4 py-2 text-[13px] font-semibold mr-1"
           >
-            <GithubIcon className="h-3.5 w-3.5" />
+            <GithubIcon className="h-4 w-4 text-white" />
             Sign in
           </button>
         )}

@@ -54,22 +54,14 @@ interface AppChromeProps {
     }
   } | null
   initialRepositories: Repository[]
-  /** 'blend' — chat scene covers the whole column incl. header · 'dark' — dark chrome bar over greige canvas */
-  variant?: 'blend' | 'dark'
+  /** Extra classes for the main body — e.g. 'chat-scene overflow-hidden' on the chat screen. */
   bodyClassName?: string
   children: React.ReactNode
 }
 
-export function AppChrome({
-  user,
-  initialRepositories,
-  variant = 'dark',
-  bodyClassName,
-  children,
-}: AppChromeProps) {
+export function AppChrome({ user, initialRepositories, bodyClassName, children }: AppChromeProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const blend = variant === 'blend'
 
   const [repositories, setRepositories] = useState<Repository[]>(initialRepositories)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -137,14 +129,15 @@ export function AppChrome({
 
   return (
     <AppChromeContext.Provider value={value}>
-      <div className={`flex h-screen w-screen flex-col overflow-hidden ${blend ? 'chat-scene' : ''}`}>
-        <Header user={user} onMenuClick={handleMenuClick} variant={blend ? 'blend' : 'dark'} />
+      <div className="flex h-screen w-screen flex-col overflow-hidden bg-[var(--background)]">
+        <Header user={user} onMenuClick={handleMenuClick} />
 
         <div className="relative flex min-h-0 flex-1 overflow-hidden">
-          {/* Desktop sidebar — always dark */}
+          {/* Desktop sidebar — dark chrome */}
           <AnimatePresence initial={false}>
             {desktopSidebarOpen && (
               <motion.aside
+                key="desktop-sidebar"
                 initial={{ width: 0 }}
                 animate={{ width: 268 }}
                 exit={{ width: 0 }}
@@ -156,10 +149,10 @@ export function AppChrome({
             )}
           </AnimatePresence>
 
-          {/* Mobile drawer — dark */}
+          {/* Mobile drawer — dark chrome */}
           <AnimatePresence>
             {drawerOpen && (
-              <div className="fixed inset-0 z-50 md:hidden">
+              <div key="mobile-drawer" className="fixed inset-0 z-50 md:hidden">
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}

@@ -16,7 +16,7 @@ export default async function Home() {
   }
 
   return (
-    <AppChrome user={user} initialRepositories={repositories} variant="blend" bodyClassName="overflow-hidden">
+    <AppChrome user={user} initialRepositories={repositories} bodyClassName="chat-scene overflow-hidden">
       <ChatCanvas />
     </AppChrome>
   )

@@ -65,13 +65,14 @@
   --chrome-text-muted: #767e8b;
 }
 
-/* Gemini-style warm chat scene — covers the full column on the chat screen */
+/* Gemini-style warm chat scene — cool blue top melting into creamy sand */
 .chat-scene {
   background:
-    radial-gradient(1100px 560px at 12% -12%, rgba(164, 194, 255, 0.42), transparent 62%),
-    radial-gradient(900px 520px at 108% 10%, rgba(255, 213, 184, 0.38), transparent 60%),
-    radial-gradient(820px 620px at 50% 118%, rgba(255, 226, 205, 0.45), transparent 66%),
-    linear-gradient(180deg, #f3eee6 0%, #f6f1ea 45%, #f0e9df 100%);
+    radial-gradient(100rem 44rem at 8% -12%, rgba(168, 196, 244, 0.5), transparent 60%),
+    radial-gradient(88rem 40rem at 106% 10%, rgba(148, 202, 235, 0.32), transparent 58%),
+    radial-gradient(112rem 54rem at 94% 114%, rgba(247, 199, 152, 0.46), transparent 64%),
+    radial-gradient(84rem 42rem at -4% 116%, rgba(240, 205, 160, 0.42), transparent 60%),
+    linear-gradient(178deg, #eef0f5 0%, #f3efe6 36%, #f4ecdc 70%, #eee1cb 100%);
 }
 
 html {
