@@ -1,10 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { AppChrome } from '@/components/app-chrome'
 import { ChatCanvas } from '@/components/chat-canvas'
+import { Landing } from '@/components/landing'
 
 export default async function Home() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+
+  if (!user) {
+    return <Landing />
+  }
 
   let repositories = []
   if (user) {
