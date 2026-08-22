@@ -15,22 +15,10 @@ export type NavigationSection = {
 };
 
 const navigationData: NavigationSection[] = [
-  {
-    title: "Features",
-    href: "#features",
-  },
-  {
-    title: "How it works",
-    href: "#how",
-  },
-  {
-    title: "Testimonials",
-    href: "#testimonials",
-  },
-  {
-    title: "Integrations",
-    href: "#integrations",
-  },
+  { title: "Features", href: "#hero" },
+  { title: "How it works", href: "#how" },
+  { title: "Testimonials", href: "#testimonials" },
+  { title: "Integrations", href: "#integrations" },
 ];
 
 const SignInButton = ({ className }: { className?: string }) => {
@@ -39,11 +27,11 @@ const SignInButton = ({ className }: { className?: string }) => {
     <Button
       onClick={signInWithGitHub}
       className={cn(
-        "relative text-sm font-semibold rounded-full h-10 p-1 ps-5 pe-12 group transition-all duration-500 hover:ps-12 hover:pe-5 w-fit overflow-hidden bg-white text-[#14161c] hover:bg-slate-200",
+        "relative cursor-pointer text-sm font-semibold rounded-full h-10 p-1 ps-5 pe-12 group transition-all duration-500 hover:ps-12 hover:pe-5 w-fit overflow-hidden bg-white text-[#14161c] shadow-[0_8px_24px_-10px_rgba(255,255,255,0.45)] hover:bg-slate-200",
         className,
       )}
     >
-      <span className="relative z-10 transition-all duration-500 hover:cursor-pointer">Sign in</span>
+      <span className="relative z-10 transition-all duration-500">Sign in</span>
       <div className="absolute right-1 w-8 h-8 bg-[#14161c] text-white rounded-full flex items-center justify-center transition-all duration-500 group-hover:right-[calc(100%-36px)] group-hover:rotate-45">
         <GithubIcon className="h-4 w-4" />
       </div>
@@ -67,8 +55,16 @@ const WayCodeLogo = () => (
 const Navbar = () => {
   const [sticky, setSticky] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [active, setActive] = useState<string>("");
+
   const handleScroll = useCallback(() => {
     setSticky(window.scrollY >= 50);
+    let current = "";
+    for (const { href } of navigationData) {
+      const el = document.getElementById(href.slice(1));
+      if (el && el.getBoundingClientRect().top <= 160) current = href;
+    }
+    setActive(current);
   }, []);
 
   const handleResize = useCallback(() => {
@@ -76,7 +72,7 @@ const Navbar = () => {
   }, []);
 
   useEffect(() => {
-    window.addEventListener("scroll", handleScroll);
+    window.addEventListener("scroll", handleScroll, { passive: true });
     window.addEventListener("resize", handleResize);
 
     return () => {
@@ -89,7 +85,9 @@ const Navbar = () => {
     <header
       className={cn(
         "sticky top-0 z-50 border-b transition-all duration-300",
-        sticky ? "border-white/[0.08] bg-[#14161c]/90 backdrop-blur-xl" : "border-transparent bg-[#14161c]",
+        sticky
+          ? "border-white/10 bg-[#14161c]/90 shadow-[0_12px_40px_-16px_rgba(0,0,0,0.7)] backdrop-blur-xl"
+          : "border-transparent bg-[#14161c]",
       )}
     >
       <div id="top" />
@@ -98,43 +96,58 @@ const Navbar = () => {
           className={cn(
             "w-full flex items-center h-fit justify-between gap-3.5 lg:gap-6 transition-all duration-500",
             sticky
-              ? "p-2.5 bg-background/60 backdrop-blur-lg border border-border/40 shadow-2xl shadow-primary/5 rounded-full"
+              ? "p-2 pl-3 pr-2 bg-[#1e222b]/80 backdrop-blur-xl border border-white/[0.12] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_20px_50px_-20px_rgba(0,0,0,0.9)] rounded-full"
               : "bg-transparent border-transparent",
           )}
         >
           <WayCodeLogo />
-          <NavigationMenu className="max-lg:hidden bg-white/[0.07] p-0.5 rounded-full">
+
+          {/* Desktop nav — scroll-spy active chip */}
+          <NavigationMenu className="max-lg:hidden p-1 bg-black/30 rounded-full ring-1 ring-white/[0.08]">
             <NavigationMenuList className="flex gap-0">
-              {navigationData.map((navItem) => (
-                <NavigationMenuItem key={navItem.title}>
-                  <NavigationMenuLink
-                    href={navItem.href}
-                    className="px-2 lg:px-4 py-2 text-sm font-medium rounded-full text-slate-300 hover:text-white hover:bg-white/10 outline outline-transparent hover:outline-white/15 hover:shadow-xs transition tracking-normal"
-                  >
-                    {navItem.title}
-                  </NavigationMenuLink>
-                </NavigationMenuItem>
-              ))}
+              {navigationData.map((navItem) => {
+                const isActive = active === navItem.href;
+                return (
+                  <NavigationMenuItem key={navItem.title}>
+                    <NavigationMenuLink
+                      href={navItem.href}
+                      data-active={isActive || undefined}
+                      className={cn(
+                        "relative px-2 lg:px-4 py-2 text-sm font-medium rounded-full transition-all duration-300 tracking-normal",
+                        isActive
+                          ? "text-white bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] shadow-[0_6px_18px_-6px_var(--brand-glow)]"
+                          : "text-slate-300 hover:text-white hover:bg-white/10",
+                      )}
+                    >
+                      {navItem.title}
+                    </NavigationMenuLink>
+                  </NavigationMenuItem>
+                );
+              })}
             </NavigationMenuList>
           </NavigationMenu>
 
           <SignInButton className="hidden sm:flex" />
 
+          {/* Mobile */}
           <div className="sm:hidden flex items-center gap-2">
             <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-              <DropdownMenuTrigger className="rounded-full bg-white/[0.07] border border-white/10 text-white p-2 outline-none flex items-center justify-center cursor-pointer transition-colors">
+              <DropdownMenuTrigger className="rounded-full bg-white/[0.07] border border-white/10 text-white p-2 outline-none flex items-center justify-center cursor-pointer transition-colors hover:bg-white/15">
                 <TextAlignJustify size={20} />
                 <span className="sr-only">Menu</span>
               </DropdownMenuTrigger>
 
-              <DropdownMenuContent align="end" className="w-56 mt-2 bg-[#1d2027] border-white/10 text-slate-200">
+              <DropdownMenuContent align="end" className="w-56 mt-2 bg-[#1e222b] border-white/10 text-slate-200">
                 {navigationData.map((item) => (
-                  <DropdownMenuItem key={item.title}>
+                  <DropdownMenuItem key={item.title} data-active={active === item.href || undefined} className={cn(active === item.href && "bg-white/10")}>
                     <a href={item.href} className="w-full cursor-pointer text-sm font-medium hover:text-white">
                       {item.title}
                     </a>
                   </DropdownMenuItem>
                 ))}
+                <div className="sm:hidden pt-2 mt-1 border-t border-white/10">
+                  <SignInButton className="w-full flex" />
+                </div>
               </DropdownMenuContent>
             </DropdownMenu>
             <SignInButton />
