@@ -203,13 +203,33 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
 
   const handleSave = async () => {
     setIsSaving(true)
-    // Simulated persistence beat for perceived responsiveness; vault save endpoint can be wired here.
-    await new Promise((r) => setTimeout(r, 600))
-    setIsSaving(false)
-    toast.success('Vault updated', {
-      description: `${meta.label} · ${model}`,
-    })
-    onClose()
+    try {
+      const res = await fetch('/api/settings/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          provider,
+          apiKey: apiKey.trim() || undefined,
+          model,
+          customBaseUrl: baseUrl,
+          testStatus: 'connected',
+        }),
+      })
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        toast.success('Vault updated', {
+          description: `${meta.label} · ${model}${data.keyReplaced ? '' : ' · key kept from vault'}`,
+        })
+        onClose()
+      } else {
+        toast.error('Could not save vault', { description: data.error || 'Try again in a moment.' })
+      }
+    } catch {
+      toast.error('Network error', { description: 'Could not reach the save endpoint.' })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (

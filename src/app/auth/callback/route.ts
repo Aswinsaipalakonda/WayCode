@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { encryptSecret } from '@/lib/crypto'
 import { redirect } from 'next/navigation'
 
 export async function GET(request: Request) {
@@ -13,6 +14,17 @@ export async function GET(request: Request) {
     if (!error && session) {
       const providerToken = session.provider_token
       if (providerToken) {
+        // Persist the GitHub write token server-side (encrypted at rest) so the
+        // daemon can clone private repos and push approved diffs as this user.
+        try {
+          await supabase.from('user_settings').upsert(
+            { user_id: session.user.id, github_token: encryptSecret(providerToken) },
+            { onConflict: 'user_id' },
+          )
+        } catch (e) {
+          console.error('Failed to store GitHub token:', e)
+        }
+
         try {
           // Fetch authenticated user's repositories (type=owner only to get user's exact repositories)
           const ghRes = await fetch('https://api.github.com/user/repos?affiliation=owner&sort=updated&per_page=100', {

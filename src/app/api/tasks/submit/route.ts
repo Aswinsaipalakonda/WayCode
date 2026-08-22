@@ -17,16 +17,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Prompt intent is required' }, { status: 400 })
     }
 
-    // 1. Fetch user active AI Provider key & model settings
-    const { data: settings } = await supabase
-      .from('user_settings')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
-
-    const provider = settings?.provider || 'openrouter'
-    const model = settings?.selected_model || 'google/gemini-2.0-flash-exp:free'
-    const apiKey = settings?.api_key || ''
+    // 1. Verify the repository belongs to the caller (RLS also enforces this on select).
+    if (repoId) {
+      const { data: ownedRepo } = await supabase
+        .from('repositories')
+        .select('id')
+        .eq('id', repoId)
+        .single()
+      if (!ownedRepo) {
+        return NextResponse.json({ error: 'Repository not found for this account' }, { status: 403 })
+      }
+    }
 
     // 2. Insert new task job record into Supabase (Status: queued)
     const { data: job, error: jobError } = await supabase
@@ -52,16 +53,15 @@ export async function POST(request: Request) {
       message: `Task queued for repository: ${repoName || 'Default'}`,
     })
 
-    // 4. Push payload to Redis queue 'waycode:tasks'
+    // 4. Push payload to Redis queue 'waycode:tasks'.
+    //    Secrets are intentionally excluded — the daemon resolves the user's
+    //    encrypted provider key + GitHub token via the service-role client.
     const payload = JSON.stringify({
       taskId: job.id,
       userId: user.id,
-      repoName: repoName || 'Default',
+      repoName: repoName || '',
       prompt,
       branchName: job.branch_name,
-      provider,
-      model,
-      apiKey,
     })
 
     try {

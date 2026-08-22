@@ -77,14 +77,21 @@ export function edit_file(directoryPath: string, filePath: string, newContent: s
 
 /**
  * Deterministic ACI Tool 4: run_syntax_check
- * Runs local compiler/type check (npx tsc --noEmit or npm run build)
+ * Runs local compiler/type check (npx tsc --noEmit or npm run build).
+ * Repos without a tsconfig are skipped (nothing meaningful to check).
  */
 export function run_syntax_check(directoryPath: string): { success: boolean; output: string } {
   try {
-    const output = execSync('npx tsc --noEmit', {
+    if (!fs.existsSync(path.join(directoryPath, 'tsconfig.json'))) {
+      return { success: true, output: 'No tsconfig.json found — syntax check skipped for this repository.' }
+    }
+
+    // `-p typescript` is required: bare `npx tsc` resolves to the deprecated
+    // placeholder package when the sandbox has no local TypeScript install.
+    const output = execSync('npx --yes -p typescript tsc --noEmit', {
       cwd: directoryPath,
       encoding: 'utf-8',
-      timeout: 30000,
+      timeout: 120000,
       stdio: 'pipe',
     })
     return { success: true, output: output || 'Syntax check passed with zero errors.' }
