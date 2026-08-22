@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({ success: true, message: 'Job approved & pushed' })
-  } catch (err: unknown) {
+  } catch {
     return NextResponse.json({ error: 'Failed to approve task' }, { status: 500 })
   }
 }

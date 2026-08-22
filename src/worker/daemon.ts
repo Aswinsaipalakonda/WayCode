@@ -2,7 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { createClient } from '@supabase/supabase-js'
 import Redis from 'ioredis'
-import { list_files, read_file, edit_file, run_syntax_check } from './tools'
+import { list_files, run_syntax_check } from './tools'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://cczeusftmsaykelqyfgu.supabase.co'
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -21,7 +21,7 @@ async function writeLog(taskId: string, logLevel: string, message: string) {
 }
 
 async function updateJobStatus(taskId: string, status: string, diffContent?: string) {
-  const updateData: Record<string, any> = { status, updated_at: new Date().toISOString() }
+  const updateData: Record<string, string> = { status, updated_at: new Date().toISOString() }
   if (diffContent) updateData.diff_content = diffContent
 
   await supabase
@@ -34,7 +34,7 @@ async function processJob(jobPayload: string) {
   const job = JSON.parse(jobPayload)
   const { taskId, repoName, prompt, branchName, apiKey, model } = job
 
-  await writeLog(taskId, 'info', `[START] Worker daemon picked up job for repo: ${repoName}`)
+  await writeLog(taskId, 'info', `Started working on this task for ${repoName}.`)
   await updateJobStatus(taskId, 'processing')
 
   const sandboxDir = path.join(process.cwd(), 'sandbox', taskId)
@@ -45,9 +45,9 @@ async function processJob(jobPayload: string) {
     }
 
     // Step 1: Tool Call - list_files
-    await writeLog(taskId, 'tool_call', `[TOOL] list_files(${sandboxDir})`)
+    await writeLog(taskId, 'tool_call', `Exploring the repository structure…`)
     const files = list_files(sandboxDir)
-    await writeLog(taskId, 'info', `Found ${files.length} workspace files.`)
+    await writeLog(taskId, 'info', `Found ${files.length} files in the workspace.`)
 
     // Step 2: OpenRouter / Gemini API Agent Execution Loop
     const systemPrompt = `You are WayCode Autonomous AI Engineering Agent. 
@@ -55,7 +55,7 @@ Your goal is to execute code edits for intent: "${prompt}".
 Repository: ${repoName}.
 Available files: ${files.join(', ')}.`
 
-    await writeLog(taskId, 'info', `[AGENT] Sending system prompt & intent context to model ${model}...`)
+    await writeLog(taskId, 'info', `Sending the task to the AI model (${model})…`)
 
     // Call AI provider (OpenRouter/Gemini API)
     const providerApiKey = apiKey || process.env.OPENROUTER_API_KEY || ''
@@ -80,6 +80,7 @@ Available files: ${files.join(', ')}.`
       if (res.ok) {
         const resData = await res.json()
         aiResponseText = resData.choices?.[0]?.message?.content || ''
+        await writeLog(taskId, 'info', `The model responded with a plan (${aiResponseText.length} characters).`)
       }
     }
 
@@ -90,17 +91,17 @@ Available files: ${files.join(', ')}.`
 
     while (attempt < maxAttempts && !buildPassed) {
       attempt++
-      await writeLog(taskId, 'syntax_check', `[CHECK] Self-healing build attempt ${attempt}/${maxAttempts}...`)
+      await writeLog(taskId, 'syntax_check', `Verifying the build (attempt ${attempt} of ${maxAttempts})…`)
 
       const check = run_syntax_check(sandboxDir)
 
       if (check.success) {
         buildPassed = true
-        await writeLog(taskId, 'info', `[SUCCESS] Compiler check passed with 0 errors!`)
+        await writeLog(taskId, 'success', `Build verified with zero errors.`)
       } else {
-        await writeLog(taskId, 'error', `[ERROR] Build error output: ${check.output.slice(0, 150)}...`)
+        await writeLog(taskId, 'error', `Build issue found: ${check.output.slice(0, 120)}…`)
         // Feed error output back to AI model to self-heal
-        await writeLog(taskId, 'info', `[SELF-HEAL] Feeding compiler stderr back to AI model for auto-correction turn...`)
+        await writeLog(taskId, 'info', `Asking the model to fix the issue and trying again…`)
       }
     }
 
@@ -114,11 +115,11 @@ Available files: ${files.join(', ')}.`
 `
 
     await updateJobStatus(taskId, 'verifying', generatedDiff)
-    await writeLog(taskId, 'info', `[VERIFIED] Task reached BUILD_VERIFIED state. Ready for mobile diff review & approval.`)
+    await writeLog(taskId, 'info', `Changes are ready for your review.`)
 
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : String(err)
-    await writeLog(taskId, 'error', `[FAILED] Terminal error: ${errorMsg}`)
+    await writeLog(taskId, 'error', `Something went wrong: ${errorMsg}`)
     await updateJobStatus(taskId, 'failed')
   } finally {
     // Teardown Sandbox Folder

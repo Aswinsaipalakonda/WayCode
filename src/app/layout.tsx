@@ -1,44 +1,63 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { ThemeProvider } from "@/components/theme-provider";
+import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono } from "next/font/google";
+import { Toaster } from "sonner";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "WayCode — Mobile Gateway for Autonomous AI Engineering Agents",
-  description: "Asynchronous, intent-driven mobile gateway for offloading software engineering tasks to a persistent cloud AI daemon.",
-  icons: {
-    icon: "/logo.png",
-    shortcut: "/logo.png",
-    apple: "/logo.png",
-  },
+  title: "WayCode — Ship code from anywhere",
+  description:
+    "Describe the change in plain language. WayCode branches, codes, builds — you review the diff and ship.",
+};
+
+export const viewport: Viewport = {
+  themeColor: "#f8f8f6",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} min-h-full flex flex-col antialiased`}>
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+    <html lang="en">
+      <body
+        className={`${inter.variable} ${jetbrainsMono.variable} min-h-full flex flex-col antialiased`}
+      >
+        <div className="ambient-scene" aria-hidden="true">
+          <div className="ambient-orb ambient-orb-1" />
+          <div className="ambient-orb ambient-orb-2" />
+          <div className="ambient-orb ambient-orb-3" />
+        </div>
+
+        {children}
+
+        <Toaster
+          position="top-center"
+          toastOptions={{
+            style: {
+              background: "#ffffff",
+              border: "1px solid var(--border)",
+              color: "var(--foreground)",
+              borderRadius: "16px",
+              boxShadow: "0 12px 40px -12px rgba(24,30,44,0.25)",
+              fontSize: "13px",
+            },
+          }}
+        />
       </body>
     </html>
   );

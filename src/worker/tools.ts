@@ -88,12 +88,13 @@ export function run_syntax_check(directoryPath: string): { success: boolean; out
       stdio: 'pipe',
     })
     return { success: true, output: output || 'Syntax check passed with zero errors.' }
-  } catch (err: any) {
-    const stderr = err.stderr ? err.stderr.toString() : ''
-    const stdout = err.stdout ? err.stdout.toString() : ''
+  } catch (err: unknown) {
+    const e = err as { stderr?: Buffer; stdout?: Buffer; message?: string }
+    const stderr = e.stderr ? e.stderr.toString() : ''
+    const stdout = e.stdout ? e.stdout.toString() : ''
     return {
       success: false,
-      output: stderr || stdout || err.message || 'Syntax validation failed.',
+      output: stderr || stdout || e.message || 'Syntax validation failed.',
     }
   }
 }

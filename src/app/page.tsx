@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { MainLayout } from '@/components/main-layout'
+import { AppChrome } from '@/components/app-chrome'
+import { ChatCanvas } from '@/components/chat-canvas'
 
 export default async function Home() {
   const supabase = await createClient()
@@ -14,5 +15,9 @@ export default async function Home() {
     repositories = data || []
   }
 
-  return <MainLayout user={user} initialRepositories={repositories} />
+  return (
+    <AppChrome user={user} initialRepositories={repositories} variant="blend" bodyClassName="overflow-hidden">
+      <ChatCanvas />
+    </AppChrome>
+  )
 }

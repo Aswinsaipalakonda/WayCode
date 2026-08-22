@@ -3,69 +3,94 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { MessageSquare, CheckSquare, Settings, User } from 'lucide-react'
+import { motion } from 'motion/react'
+import { House, ListChecks, Settings2, UserRound } from 'lucide-react'
 import { SettingsDrawer } from '@/components/settings-drawer'
 
-export function BottomNav({ onOpenSettings }: { onOpenSettings?: () => void }) {
+export function BottomNav() {
   const pathname = usePathname()
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-
-  const handleSettingsClick = () => {
-    if (onOpenSettings) {
-      onOpenSettings()
-    } else {
-      setIsSettingsOpen(true)
-    }
-  }
-
-  const navItems = [
-    { label: 'Chat', href: '/', icon: MessageSquare },
-    { label: 'Tasks', href: '/tasks', icon: CheckSquare },
-    { label: 'Settings', action: handleSettingsClick, icon: Settings },
-    { label: 'Profile', href: '/profile', icon: User },
-  ]
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   return (
     <>
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-16 bg-[var(--card)]/95 backdrop-blur-lg border-t border-[var(--border)] px-4 flex items-center justify-around select-none shadow-2xl">
-        {navItems.map((item) => {
-          const Icon = item.icon
-          const isActive = item.href ? pathname === item.href : false
-
-          if (item.action) {
-            return (
-              <button
-                key={item.label}
-                onClick={item.action}
-                className="flex flex-col items-center justify-center gap-1 text-[10px] font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition-all"
-              >
-                <Icon className="w-5 h-5" />
-                <span>{item.label}</span>
-              </button>
-            )
-          }
-
-          return (
-            <Link
-              key={item.label}
-              href={item.href!}
-              className={`flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition-all ${
-                isActive
-                  ? 'text-[var(--primary)] font-bold scale-105'
-                  : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
-              }`}
-            >
-              <Icon className="w-5 h-5" />
-              <span>{item.label}</span>
-            </Link>
-          )
-        })}
+      <nav
+        className="fixed inset-x-0 z-40 md:hidden px-4 bottom-[max(12px,env(safe-area-inset-bottom))]"
+        aria-label="Primary"
+      >
+        <div className="flex items-center gap-1 rounded-[32px] border border-black/[0.06] bg-white/95 backdrop-blur-xl px-2 py-2 shadow-[0_18px_50px_-16px_rgba(26,30,40,0.35)]">
+          <NavLink href="/" label="Home" icon={House} active={pathname === '/'} />
+          <NavLink href="/tasks" label="Jobs" icon={ListChecks} active={pathname === '/tasks'} />
+          <NavItemButton label="Settings" icon={Settings2} onClick={() => setSettingsOpen(true)} />
+          <NavLink href="/profile" label="Profile" icon={UserRound} active={pathname === '/profile'} />
+        </div>
       </nav>
 
-      <SettingsDrawer
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
+      <SettingsDrawer isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </>
   )
 }
+
+function NavLink({
+  href,
+  label,
+  icon: Icon,
+  active,
+}: {
+  href: string
+  label: string
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>
+  active: boolean
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? 'page' : undefined}
+      className="pressable relative flex flex-1 flex-col items-center justify-center gap-1 rounded-full py-2.5"
+    >
+      {active && (
+        <motion.span
+          layoutId="nav-pill"
+          transition={{ type: 'spring', stiffness: 430, damping: 34 }}
+          className="absolute inset-x-1 inset-y-0 rounded-full bg-[#17191f] shadow-[0_6px_18px_-6px_rgba(23,25,31,0.55)]"
+        />
+      )}
+      <Icon
+        className={`relative h-[19px] w-[19px] transition-colors duration-200 ${
+          active ? 'text-white' : 'text-[var(--muted-foreground)]'
+        }`}
+        strokeWidth={active ? 2.3 : 2}
+      />
+      <span
+        className={`relative text-[10.5px] font-semibold tracking-wide transition-colors duration-200 ${
+          active ? 'text-white' : 'text-[var(--muted-foreground)]'
+        }`}
+      >
+        {label}
+      </span>
+    </Link>
+  )
+}
+
+function NavItemButton({
+  label,
+  icon: Icon,
+  onClick,
+}: {
+  label: string
+  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>
+  onClick: () => void
+}) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      className="pressable relative flex flex-1 flex-col items-center justify-center gap-1 rounded-full py-2.5"
+    >
+      <Icon className="h-[19px] w-[19px] text-[var(--muted-foreground)]" strokeWidth={2} />
+      <span className="text-[10.5px] font-semibold tracking-wide text-[var(--muted-foreground)]">
+        {label}
+      </span>
+    </button>
+  )
+}
+

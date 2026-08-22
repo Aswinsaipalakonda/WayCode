@@ -1,153 +1,161 @@
 'use client'
 
 import { useState } from 'react'
-import { Folder, Plus, History, Clock, Settings, RefreshCw, ChevronRight } from 'lucide-react'
-
-interface Repository {
-  id: string
-  repo_name: string
-  default_branch: string
-}
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { motion, AnimatePresence } from 'motion/react'
+import { toast } from 'sonner'
+import { Plus, History, RefreshCw, ChevronRight, GitBranch, Settings2, Circle } from 'lucide-react'
+import { useAppChrome } from '@/components/app-chrome'
 
 interface SidebarProps {
-  repositories: Repository[]
-  selectedRepo: Repository | null
-  onSelectRepo: (repo: Repository) => void
-  onOpenSettings: () => void
-  onSyncRepos: () => void
+  onNavigate?: () => void
 }
 
-export function Sidebar({
-  repositories,
-  selectedRepo,
-  onSelectRepo,
-  onOpenSettings,
-  onSyncRepos,
-}: SidebarProps) {
-  const [isSyncing, setIsSyncing] = useState(false)
+export function Sidebar({ onNavigate }: SidebarProps) {
+  const pathname = usePathname()
+  const { repositories, selectedRepo, onSelectRepo, syncRepos, isSyncing, openSettings, triggerNewTask } =
+    useAppChrome()
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const handleSync = async () => {
-    setIsSyncing(true)
-    await onSyncRepos()
-    setIsSyncing(false)
-  }
-
-  // Sample tasks per repository matching Antigravity 2.0 sidebar design
-  const sampleTasks: Record<string, Array<{ title: string; time: string }>> = {
-    'kvr-motors-erp-1': [
-      { title: 'Application Presentation...', time: '7d' },
-      { title: 'Fixing Supervisor Dashb...', time: '28d' },
-    ],
-    'Skillvault-047': [
-      { title: 'Fixing Navigation and In...', time: '3m' },
-      { title: 'Developing Certification...', time: '1mo' },
-    ],
-    'GramaVoice': [
-      { title: 'Optimizing Grievance Flow...', time: '2mo' },
-    ],
+    try {
+      const repos = await syncRepos()
+      toast.success('Repositories synced', {
+        description: `${repos.length} ${repos.length === 1 ? 'repository' : 'repositories'} connected.`,
+      })
+    } catch {
+      toast.error('Sync failed', { description: 'Could not refresh your repositories right now.' })
+    }
   }
 
   return (
-    <aside className="w-64 h-full bg-[var(--card)] border-r border-[var(--border)] flex flex-col justify-between p-3 select-none text-xs">
-      {/* Top Section */}
-      <div className="space-y-4">
-        {/* Top Quick Actions */}
-        <div className="space-y-1.5">
-          <button className="w-full bg-[var(--primary)] text-white font-semibold py-2 px-4 rounded-full flex items-center justify-center gap-2 transition-all shadow-sm hover:opacity-90">
-            <Plus className="w-4 h-4 text-white" />
-            <span>New Conversation</span>
-          </button>
-          
-          <button className="w-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] py-2 px-4 rounded-full flex items-center gap-2 transition-colors">
-            <History className="w-4 h-4" />
-            <span>Conversation History</span>
-          </button>
+    <aside className="flex h-full w-full flex-col bg-[var(--chrome-bg)] text-[13px] select-none">
+      {/* Primary actions */}
+      <div className="space-y-1 p-3">
+        <button
+          onClick={() => {
+            triggerNewTask()
+            onNavigate?.()
+          }}
+          className="btn-brand pressable flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-[13px] font-semibold"
+        >
+          <Plus className="h-4 w-4" strokeWidth={2.5} />
+          New Task
+        </button>
 
-          <button className="w-full hover:bg-[var(--muted)] text-[var(--muted-foreground)] hover:text-[var(--foreground)] py-2 px-4 rounded-full flex items-center gap-2 transition-colors">
-            <Clock className="w-4 h-4" />
-            <span>Scheduled Tasks</span>
+        <Link
+          href="/tasks"
+          onClick={onNavigate}
+          className={`pressable flex items-center gap-2.5 rounded-full px-3.5 py-2.5 font-medium ${
+            pathname === '/tasks'
+              ? 'bg-white/10 text-[var(--chrome-text)]'
+              : 'text-[var(--chrome-text-secondary)] hover:bg-white/6 hover:text-[var(--chrome-text)]'
+          }`}
+        >
+          <History className="h-4 w-4" />
+          Job History
+        </Link>
+      </div>
+
+      {/* Repositories */}
+      <div className="min-h-0 flex-1 overflow-hidden px-3 pb-3">
+        <div className="mb-1 flex items-center justify-between px-1.5 pt-1 pb-1">
+          <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--chrome-text-muted)]">
+            Repositories · {repositories.length}
+          </span>
+          <button
+            onClick={handleSync}
+            aria-label="Sync repositories"
+            className="pressable rounded-full p-1.5 text-[var(--chrome-text-muted)] hover:bg-white/8 hover:text-[var(--chrome-text)]"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
           </button>
         </div>
 
-        {/* Projects / Repositories Section */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between px-3 text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-            <span>Projects ({repositories.length})</span>
-            <button
-              onClick={handleSync}
-              className="hover:text-[var(--foreground)] p-1 rounded-full transition-colors"
-              title="Sync Repositories"
-            >
-              <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
+        <div className="max-h-full space-y-0.5 overflow-y-auto pr-0.5 pb-1">
+          {repositories.length === 0 ? (
+            <p className="anim-fade-in px-2 py-4 text-center text-xs leading-relaxed text-[var(--chrome-text-muted)]">
+              Connect a repository to start dispatching tasks.
+            </p>
+          ) : (
+            repositories.map((repo, i) => {
+              const shortName = repo.repo_name.split('/')[1] || repo.repo_name
+              const isSelected = selectedRepo?.id === repo.id
+              const isExpanded = expandedId === repo.id
 
-          <div className="space-y-2 overflow-y-auto max-h-[calc(100vh-280px)] pr-1">
-            {repositories.length === 0 ? (
-              <div className="p-3 text-center space-y-2 bg-[var(--background)] rounded-2xl border border-[var(--border)]">
-                <p className="text-[11px] text-[var(--muted-foreground)]">No projects synced</p>
-                <button
-                  onClick={handleSync}
-                  className="w-full bg-[var(--primary)] text-white text-[11px] font-semibold py-1.5 px-3 rounded-full"
+              return (
+                <motion.div
+                  key={repo.id}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.04, duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
                 >
-                  Sync Repos
-                </button>
-              </div>
-            ) : (
-              repositories.map((repo) => {
-                const isSelected = selectedRepo?.id === repo.id
-                const shortName = repo.repo_name.split('/')[1] || repo.repo_name
-                const tasks = sampleTasks[shortName] || [
-                  { title: 'Refactoring Architecture...', time: '1d' },
-                  { title: 'Updating Dependencies...', time: '3d' },
-                ]
-
-                return (
-                  <div key={repo.id} className="space-y-1">
-                    {/* Repository Folder Header */}
-                    <button
-                      onClick={() => onSelectRepo(repo)}
-                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-full transition-all font-medium text-left ${
-                        isSelected
-                          ? 'bg-[var(--primary)] text-white font-bold shadow-xs'
-                          : 'hover:bg-[var(--muted)] text-[var(--foreground)]'
+                  <button
+                    onClick={() => {
+                      onSelectRepo(repo)
+                      onNavigate?.()
+                    }}
+                    className={`pressable group flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left ${
+                      isSelected
+                        ? 'bg-[rgba(10,102,255,0.18)] font-semibold text-[#6aa5ff]'
+                        : 'text-[var(--chrome-text-secondary)] hover:bg-white/6 hover:text-[var(--chrome-text)]'
+                    }`}
+                  >
+                    <Circle
+                      className={`h-2 w-2 shrink-0 transition-colors ${
+                        isSelected ? 'fill-[#6aa5ff] text-[#6aa5ff]' : 'text-[var(--chrome-text-muted)]'
                       }`}
-                    >
-                      <Folder className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-[var(--muted-foreground)]'}`} />
-                      <span className="truncate flex-1">{shortName}</span>
-                      <ChevronRight className={`w-3 h-3 transition-transform ${isSelected ? 'rotate-90 text-white' : 'text-[var(--muted-foreground)]'}`} />
-                    </button>
+                      fill={isSelected ? 'currentColor' : 'none'}
+                    />
+                    <span className="truncate flex-1">{shortName}</span>
+                    <ChevronRight
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setExpandedId(isExpanded ? null : repo.id)
+                      }}
+                      className={`h-3.5 w-3.5 shrink-0 opacity-50 transition-transform duration-300 ${
+                        isExpanded ? 'rotate-90' : ''
+                      }`}
+                    />
+                  </button>
 
-                    {/* Sub-tasks / Conversations under Repository */}
-                    {isSelected && (
-                      <div className="pl-6 space-y-1 border-l border-[var(--border)] ml-4 my-1">
-                        {tasks.map((t, idx) => (
-                          <button
-                            key={idx}
-                            className="w-full flex items-center justify-between px-3 py-1.5 rounded-full text-[11px] text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors text-left"
-                          >
-                            <span className="truncate">{t.title}</span>
-                            <span className="text-[9px] opacity-60 ml-1">{t.time}</span>
-                          </button>
-                        ))}
-                      </div>
+                  <AnimatePresence initial={false}>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
+                        className="overflow-hidden"
+                      >
+                        <div className="ml-7 border-l border-[var(--chrome-border)] py-1 pl-3">
+                          <span className="flex items-center gap-1.5 py-1 text-[11px] text-[var(--chrome-text-muted)]">
+                            <GitBranch className="h-3 w-3" />
+                            <code className="font-mono-code">{repo.default_branch || 'main'}</code>
+                          </span>
+                        </div>
+                      </motion.div>
                     )}
-                  </div>
-                )
-              })
-            )}
-          </div>
+                  </AnimatePresence>
+                </motion.div>
+              )
+            })
+          )}
         </div>
       </div>
 
-      {/* Bottom Settings Button */}
-      <div className="pt-2 border-t border-[var(--border)]">
+      {/* Footer */}
+      <div className="border-t border-[var(--chrome-border)] p-3">
         <button
-          onClick={onOpenSettings}
-          className="w-full flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] hover:bg-[var(--muted)] transition-colors"
+          onClick={() => {
+            openSettings()
+            onNavigate?.()
+          }}
+          className="pressable flex w-full items-center gap-2.5 rounded-full px-3.5 py-2.5 font-medium text-[var(--chrome-text-secondary)] hover:bg-white/6 hover:text-[var(--chrome-text)]"
         >
-          <Settings className="w-4 h-4" />
-          <span>Settings (BYOK Vault)</span>
+          <Settings2 className="h-4 w-4" />
+          Settings
         </button>
       </div>
     </aside>

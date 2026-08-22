@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json({ success: true, message: 'Job rejected' })
-  } catch (err: unknown) {
+  } catch {
     return NextResponse.json({ error: 'Failed to reject task' }, { status: 500 })
   }
 }

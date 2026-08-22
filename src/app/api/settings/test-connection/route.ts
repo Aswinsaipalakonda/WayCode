@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
     const startTime = Date.now()
     let apiUrl = ''
-    let headers: Record<string, string> = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     }
 

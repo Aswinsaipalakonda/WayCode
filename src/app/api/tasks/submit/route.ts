@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     await supabase.from('task_logs').insert({
       task_id: job.id,
       log_level: 'info',
-      message: `[QUEUED] Intent buffered into Redis queue for repository: ${repoName || 'Default'}`,
+      message: `Task queued for repository: ${repoName || 'Default'}`,
     })
 
     // 4. Push payload to Redis queue 'waycode:tasks'
@@ -66,8 +66,8 @@ export async function POST(request: Request) {
 
     try {
       await redis.connect()
-    } catch (e) {
-      // Connect if disconnected
+    } catch {
+      // Already connected — safe to ignore.
     }
 
     await redis.lpush('waycode:tasks', payload)

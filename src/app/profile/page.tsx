@@ -1,10 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
-import { Header } from '@/components/header'
-import { BottomNav } from '@/components/bottom-nav'
+import { AppChrome } from '@/components/app-chrome'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
-import { Mail, GitBranch, Shield, LogOut } from 'lucide-react'
-import { ModeToggle } from '@/components/mode-toggle'
+import { Mail, GitBranch, LogOut, AtSign, BadgeCheck } from 'lucide-react'
+import { GithubIcon } from '@/components/icons'
+
+export const dynamic = 'force-dynamic'
 
 export default async function ProfilePage() {
   const supabase = await createClient()
@@ -19,90 +20,115 @@ export default async function ProfilePage() {
     .select('*')
     .order('created_at', { ascending: false })
 
+  const rowCls =
+    'flex items-center justify-between gap-3 rounded-[22px] border border-black/[0.05] bg-white/90 p-4 shadow-[var(--shadow-sm)] transition-all duration-300 hover:border-black/[0.09] hover:bg-white'
+
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] flex flex-col pb-20 md:pb-0">
-      <Header user={user} repositories={repositories || []} />
-
-      <main className="flex-1 max-w-2xl w-full mx-auto p-4 md:p-8 space-y-6 animate-in slide-in-from-right duration-300">
-        <div className="bg-[var(--card)] border border-[var(--border)] rounded-3xl p-6 shadow-xl space-y-6">
-          {/* User Header */}
-          <div className="flex items-center gap-4 pb-6 border-b border-[var(--border)]">
-            {user.user_metadata?.avatar_url ? (
-              <Image
-                src={user.user_metadata.avatar_url}
-                alt="User Avatar"
-                width={64}
-                height={64}
-                className="rounded-full border-2 border-[var(--primary)] shadow-md"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-[var(--primary)] text-white text-2xl font-bold flex items-center justify-center shadow-md">
-                {user.email?.[0]?.toUpperCase() ?? 'U'}
-              </div>
-            )}
-
-            <div>
-              <h1 className="text-xl font-bold">{user.user_metadata?.full_name || 'WayCode Developer'}</h1>
-              <p className="text-xs text-[var(--muted-foreground)] flex items-center gap-1 mt-0.5">
-                <GitBranch className="w-3.5 h-3.5" />
-                @{user.user_metadata?.user_name || 'developer'}
-              </p>
-            </div>
+    <AppChrome user={user} initialRepositories={repositories || []}>
+      <div className="h-full overflow-y-auto pb-28 md:pb-10">
+        <main className="anim-slide-right mx-auto w-full max-w-xl space-y-5 px-4 pt-5 sm:px-6">
+          <div className="anim-fade-up pt-1">
+            <h1 className="text-[26px] font-bold tracking-tight sm:text-3xl">
+              <span className="text-gradient-brand">Profile</span>
+            </h1>
+            <p className="mt-1 text-[13px] text-[var(--foreground-secondary)] sm:text-sm">
+              Your account and connected sources.
+            </p>
           </div>
 
-          {/* Details Form & Settings */}
-          <div className="space-y-4 text-xs">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                Appearance & Theme Mode
-              </label>
-              <div className="flex items-center justify-between bg-[var(--background)] border border-[var(--border)] rounded-2xl p-3 text-[var(--foreground)]">
-                <span className="font-semibold">Toggle Color Scheme</span>
-                <ModeToggle />
-              </div>
-            </div>
+          {/* Identity card */}
+          <div className="anim-fade-up stagger-2 relative overflow-hidden rounded-[30px] border border-black/[0.05] bg-white/90 p-6 shadow-[var(--shadow-md)] backdrop-blur">
+            <div
+              aria-hidden
+              className="pointer-events-none absolute -right-10 -top-14 h-40 w-40 rounded-full bg-gradient-to-br from-[rgba(10,102,255,0.12)] to-[rgba(0,183,232,0.12)] blur-2xl"
+            />
+            <div className="relative flex items-center gap-4">
+              {user.user_metadata?.avatar_url ? (
+                <Image
+                  src={user.user_metadata.avatar_url}
+                  alt=""
+                  width={60}
+                  height={60}
+                  className="rounded-[20px] border border-black/10 shadow-[var(--shadow-md)]"
+                />
+              ) : (
+                <span className="flex h-[60px] w-[60px] items-center justify-center rounded-[20px] btn-brand text-xl font-extrabold">
+                  {user.email?.[0]?.toUpperCase() ?? 'U'}
+                </span>
+              )}
 
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                Email Address
-              </label>
-              <div className="flex items-center gap-2 bg-[var(--background)] border border-[var(--border)] rounded-2xl p-3 text-[var(--foreground)]">
-                <Mail className="w-4 h-4 text-[var(--primary)]" />
-                <span>{user.email}</span>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider">
-                Connected Repositories
-              </label>
-              <div className="flex items-center justify-between bg-[var(--background)] border border-[var(--border)] rounded-2xl p-3 text-[var(--foreground)]">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-emerald-500" />
-                  <span>{repositories?.length || 0} Repositories Synced</span>
-                </div>
-                <span className="text-[10px] bg-emerald-500/15 text-emerald-500 px-2.5 py-1 rounded-full font-semibold">
-                  OAuth Active
+              <div className="min-w-0">
+                <h2 className="flex items-center gap-1.5 truncate text-[17px] font-bold tracking-tight">
+                  {user.user_metadata?.full_name || 'WayCode Developer'}
+                  <BadgeCheck className="h-4 w-4 shrink-0 text-[var(--brand)]" />
+                </h2>
+                <p className="mt-0.5 flex items-center gap-1 text-xs text-[var(--muted-foreground)]">
+                  <AtSign className="h-3 w-3" />
+                  {user.user_metadata?.user_name || 'developer'}
+                </p>
+                <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-[var(--success-soft)] px-2.5 py-1 text-[10px] font-bold text-[var(--success)]">
+                  <span className="live-dot" style={{ width: 6, height: 6 }} />
+                  Signed in
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Sign Out Trigger */}
-          <form action="/auth/signout" method="post" className="pt-4 border-t border-[var(--border)]">
+          {/* Rows */}
+          <div className="anim-fade-up stagger-3 space-y-2.5">
+            <p className="px-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
+              Account
+            </p>
+
+            <div className={rowCls}>
+              <span className="flex items-center gap-2.5 text-[13px] font-semibold">
+                <span className="rounded-xl bg-[var(--brand-soft)] p-2 text-[var(--brand)]">
+                  <Mail className="h-4 w-4" />
+                </span>
+                Email
+              </span>
+              <span className="truncate text-xs text-[var(--foreground-secondary)]">{user.email}</span>
+            </div>
+
+            <div className={rowCls}>
+              <span className="flex items-center gap-2.5 text-[13px] font-semibold">
+                <span className="rounded-xl bg-[var(--success-soft)] p-2 text-[var(--success)]">
+                  <GitBranch className="h-4 w-4" />
+                </span>
+                Repositories
+              </span>
+              <span className="rounded-full bg-[var(--success-soft)] px-2.5 py-1 text-[10px] font-bold text-[var(--success)]">
+                {(repositories?.length || 0) + ' connected'}
+              </span>
+            </div>
+
+            {/* Security — with the original GitHub mark */}
+            <div className={rowCls}>
+              <span className="flex items-center gap-2.5 text-[13px] font-semibold">
+                <span className="rounded-xl bg-[#f0f1f3] p-2 text-[#24292f]">
+                  <GithubIcon className="h-4 w-4" />
+                </span>
+                Security
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[rgba(36,41,47,0.07)] px-2.5 py-1 text-[10px] font-bold text-[#24292f]">
+                <GithubIcon className="h-3 w-3" />
+                GitHub OAuth
+              </span>
+            </div>
+          </div>
+
+          {/* Sign out */}
+          <form action="/auth/signout" method="post" className="anim-fade-up stagger-4">
             <button
               type="submit"
-              className="w-full bg-red-500/10 hover:bg-red-500/20 text-red-500 font-semibold text-xs py-3 rounded-full transition-colors flex items-center justify-center gap-2 shadow-xs"
+              className="pressable flex w-full items-center justify-center gap-2 rounded-full border border-[var(--error)]/25 bg-white/80 py-3.5 text-[13px] font-bold text-[var(--error)] shadow-[var(--shadow-sm)] backdrop-blur hover:bg-[var(--error)] hover:text-white"
             >
-              <LogOut className="w-4 h-4" />
-              Sign Out Account
+              <LogOut className="h-4 w-4" />
+              Sign out
             </button>
           </form>
-        </div>
-      </main>
-
-      {/* Mobile 4-Tab Bottom Navigation */}
-      <BottomNav />
-    </div>
+        </main>
+      </div>
+    </AppChrome>
   )
 }
