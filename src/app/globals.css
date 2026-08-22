@@ -328,6 +328,62 @@ body {
 .typing-dot:nth-child(2) { animation-delay: 0.15s; }
 .typing-dot:nth-child(3) { animation-delay: 0.3s; }
 
+/* ---------- Landing animations ---------- */
+@keyframes gradient-pan {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.text-gradient-animated {
+  background: linear-gradient(105deg, var(--brand) 20%, var(--cyan) 45%, var(--brand) 75%);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient-pan 6s linear infinite;
+}
+
+@keyframes marquee-x {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.marquee-track {
+  animation: marquee-x 36s linear infinite;
+  will-change: transform;
+}
+.marquee:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+/* Soft mesh backdrop for the hero — cobalt + cyan + sand only */
+.hero-mesh {
+  background:
+    radial-gradient(52rem 30rem at 12% -8%, rgba(10, 102, 255, 0.12), transparent 62%),
+    radial-gradient(44rem 28rem at 88% 4%, rgba(0, 183, 232, 0.1), transparent 60%),
+    radial-gradient(50rem 32rem at 50% 112%, rgba(247, 199, 152, 0.16), transparent 66%),
+    linear-gradient(180deg, #fbfbf9 0%, #f7f6f2 100%);
+}
+
+.nav-link {
+  position: relative;
+}
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--brand), var(--cyan));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 0.3s var(--ease-out-expo);
+}
+.nav-link:hover::after {
+  transform: scaleX(1);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
