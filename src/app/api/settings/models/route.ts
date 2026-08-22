@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { resolveProvider, validateKey } from '@/lib/byok'
+import { fetchCatalog, resolveProvider } from '@/lib/byok'
 
 export async function POST(request: Request) {
   try {
@@ -15,27 +15,28 @@ export async function POST(request: Request) {
 
     if (!apiKey || typeof apiKey !== 'string') {
       return NextResponse.json(
-        { success: false, error: 'API key is required for validation' },
+        { success: false, error: 'API key is required to fetch models' },
         { status: 400 },
       )
     }
 
     const eff = resolveProvider(String(provider ?? 'openrouter'), apiKey, customBaseUrl)
-    const result = await validateKey(eff, apiKey.trim(), customBaseUrl)
+    const result = await fetchCatalog(eff, apiKey.trim(), customBaseUrl)
 
-    if (!result.ok) {
+    if (result.error && result.total === 0) {
       return NextResponse.json({ success: false, provider: eff, error: result.error })
     }
 
     return NextResponse.json({
       success: true,
       provider: eff,
-      latency: `${result.latencyMs}ms`,
-      latencyMs: result.latencyMs,
+      models: result.models,
+      total: result.total,
+      free: result.free,
     })
   } catch (error: unknown) {
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Unknown validation error' },
+      { success: false, error: error instanceof Error ? error.message : 'Unknown catalog error' },
       { status: 500 },
     )
   }

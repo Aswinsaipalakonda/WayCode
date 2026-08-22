@@ -1,7 +1,8 @@
-import path from 'path'
+﻿import path from 'path'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import Redis from 'ioredis'
 import { decryptSecret } from '../lib/crypto'
+import { resolveProvider, type EffectiveProvider } from '../lib/byok'
 import { runTask, type ChatMessage, type ModelCaller } from './run-task'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -13,7 +14,7 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   process.exit(1)
 }
 
-/** Service-role client — the daemon is trusted server-side infrastructure. */
+/** Service-role client â€” the daemon is trusted server-side infrastructure. */
 const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
@@ -38,11 +39,13 @@ interface UserSettingsRow {
   github_token: string | null
 }
 
-function chatEndpointFor(provider: string, customBaseUrl: string | null): string {
+function chatEndpointFor(provider: EffectiveProvider, customBaseUrl: string | null): string {
   const base = (customBaseUrl || '').replace(/\/+$/, '')
   switch (provider) {
     case 'gemini':
       return 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
+    case 'anthropic':
+      return 'https://api.anthropic.com/v1/messages'
     case 'custom':
       return base.endsWith('/chat/completions') ? base : `${base}/chat/completions`
     case 'openrouter':
@@ -51,26 +54,56 @@ function chatEndpointFor(provider: string, customBaseUrl: string | null): string
   }
 }
 
-function makeModelCaller(apiKey: string, provider: string, model: string, customBaseUrl: string | null): ModelCaller {
+function makeModelCaller(apiKey: string, providerRaw: string, model: string, customBaseUrl: string | null): ModelCaller {
+  const provider = resolveProvider(providerRaw, apiKey, customBaseUrl)
   const endpoint = chatEndpointFor(provider, customBaseUrl)
 
   return async (messages: ChatMessage[]) => {
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
-        temperature: 0.2,
-      }),
-    })
+    let res: Response
+
+    if (provider === 'anthropic') {
+      // Native Messages API — system prompt is a top-level field.
+      const system = messages.filter((m) => m.role === 'system').map((m) => m.content).join('\n')
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 4096,
+          ...(system ? { system } : {}),
+          messages: messages
+            .filter((m) => m.role !== 'system')
+            .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+        }),
+      })
+    } else {
+      // OpenAI-compatible surface (OpenRouter / Gemini OpenAI layer / custom).
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          temperature: 0.2,
+        }),
+      })
+    }
 
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
       throw new Error(`Model API error HTTP ${res.status}: ${detail.slice(0, 300)}`)
+    }
+
+    if (provider === 'anthropic') {
+      const data = (await res.json()) as { content?: Array<{ type?: string; text?: string }> }
+      return data.content?.find((c) => c.type === 'text')?.text ?? ''
     }
 
     const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
@@ -88,7 +121,7 @@ async function processJob(jobPayload: string) {
   }
 
   try {
-    // Secrets never ride through Redis — the daemon self-serves via service role.
+    // Secrets never ride through Redis â€” the daemon self-serves via service role.
     const { data: settings, error: settingsError } = await supabase
       .from('user_settings')
       .select('provider, api_key, selected_model, custom_base_url, github_token')
@@ -107,7 +140,7 @@ async function processJob(jobPayload: string) {
     apiKey = apiKey || process.env.OPENROUTER_API_KEY || ''
 
     if (!apiKey) {
-      await writeLog(job.taskId, 'error', 'No AI provider key is configured — add one in Settings to run tasks.')
+      await writeLog(job.taskId, 'error', 'No AI provider key is configured â€” add one in Settings to run tasks.')
       await updateJobStatus(job.taskId, 'failed')
       return
     }
@@ -155,7 +188,7 @@ async function processJob(jobPayload: string) {
 }
 
 async function startDaemon() {
-  console.log('🚀 WayCode ACI daemon running — waiting for jobs…')
+  console.log('ðŸš€ WayCode ACI daemon running â€” waiting for jobsâ€¦')
   if (!redis.status || redis.status === 'wait') {
     await redis.connect().catch((err: unknown) => {
       console.error('[Daemon] Redis connect failed:', err)

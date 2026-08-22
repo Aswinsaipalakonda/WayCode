@@ -15,7 +15,7 @@ export type NavigationSection = {
 };
 
 const navigationData: NavigationSection[] = [
-  { title: "Features", href: "#hero" },
+  { title: "Hero", href: "#top" },
   { title: "How it works", href: "#how" },
   { title: "Testimonials", href: "#testimonials" },
   { title: "Integrations", href: "#integrations" },

@@ -22,7 +22,6 @@ import {
   TbLoaderQuarter,
   TbClipboardText,
   TbKey,
-  TbRocket,
 } from 'react-icons/tb'
 
 interface SettingsDrawerProps {
@@ -31,6 +30,7 @@ interface SettingsDrawerProps {
 }
 
 type Provider = 'openrouter' | 'gemini' | 'custom'
+type VaultStage = 'idle' | 'validating' | 'connected' | 'error'
 
 interface ProviderMeta {
   id: Provider
@@ -45,7 +45,7 @@ const PROVIDERS: ProviderMeta[] = [
   {
     id: 'openrouter',
     label: 'OpenRouter',
-    hint: '400+ models · free tiers available',
+    hint: '400+ models · live catalog',
     color: '#6566f1',
     tint: 'rgba(101, 102, 241, 0.12)',
     Icon: SiOpenrouter,
@@ -60,8 +60,8 @@ const PROVIDERS: ProviderMeta[] = [
   },
   {
     id: 'custom',
-    label: 'Custom Endpoint',
-    hint: 'Any OpenAI-compatible URL',
+    label: 'Custom / Claude',
+    hint: 'Any OpenAI-compatible URL · sk-ant keys',
     color: '#0a66ff',
     tint: 'rgba(10, 102, 255, 0.1)',
     Icon: TbApi,
@@ -71,19 +71,14 @@ const PROVIDERS: ProviderMeta[] = [
 const KEY_PLACEHOLDER: Record<Provider, string> = {
   openrouter: 'sk-or-v1-…',
   gemini: 'AIza…',
-  custom: 'sk-…',
+  custom: 'sk-ant-… · sk-… · any OpenAI-compatible key',
 }
 
-const FREE_MODELS = [
-  'google/gemini-2.0-flash-exp:free',
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'deepseek/deepseek-r1:free',
-  'qwen/qwen-2.5-coder-32b-instruct:free',
-]
-
-const PAID_MODELS = ['anthropic/claude-3.5-sonnet', 'openai/gpt-4o']
-
-type TestState = 'idle' | 'testing' | 'connected' | 'error'
+interface ModelEntry {
+  id: string
+  name: string
+  free: boolean
+}
 
 export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
   const [provider, setProvider] = useState<Provider>('openrouter')
@@ -93,13 +88,18 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
     custom: { apiKey: '', baseUrl: '' },
   })
   const [showKey, setShowKey] = useState(false)
-  const [model, setModel] = useState(FREE_MODELS[0])
+  const [model, setModel] = useState('')
   const [search, setSearch] = useState('')
   const [copiedModel, setCopiedModel] = useState<string | null>(null)
 
-  const [testState, setTestState] = useState<TestState>('idle')
-  const [testError, setTestError] = useState<string | null>(null)
+  const [stage, setStage] = useState<VaultStage>('idle')
+  const [statusMsg, setStatusMsg] = useState<string>('')
   const [latency, setLatency] = useState<string | null>(null)
+  const [detectedProvider, setDetectedProvider] = useState<string | null>(null)
+  const [catalog, setCatalog] = useState<ModelEntry[]>([])
+  const [catalogMeta, setCatalogMeta] = useState<{ total: number; free: number }>({ total: 0, free: 0 })
+  const [loadingModels, setLoadingModels] = useState(false)
+  const [modelsError, setModelsError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
   const meta = PROVIDERS.find((p) => p.id === provider)!
@@ -107,31 +107,43 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
 
   const updateCredentials = (patch: Partial<{ apiKey: string; baseUrl: string }>) => {
     setCredentials((prev) => ({ ...prev, [provider]: { ...prev[provider], ...patch } }))
-    setTestState('idle')
-    setTestError(null)
+    // Any credential edit invalidates the previous validation.
+    setStage('idle')
+    setStatusMsg('')
+    setLatency(null)
+    setDetectedProvider(null)
+    setCatalog([])
+    setCatalogMeta({ total: 0, free: 0 })
+    setModelsError(null)
   }
 
   const switchProvider = (id: Provider) => {
     setProvider(id)
     setShowKey(false)
     setSearch('')
-    setTestState('idle')
-    setTestError(null)
+    setStage('idle')
+    setStatusMsg('')
+    setLatency(null)
+    setDetectedProvider(null)
+    setCatalog([])
+    setCatalogMeta({ total: 0, free: 0 })
   }
 
   const freeModels = useMemo(
     () =>
-      FREE_MODELS.filter((m) =>
-        m.toLowerCase().includes(search.trim().toLowerCase()),
+      catalog.filter(
+        (m) => m.free && m.name.toLowerCase().includes(search.trim().toLowerCase()),
       ),
-    [search],
+    [catalog, search],
   )
-  const paidModels = useMemo(
+  const otherModels = useMemo(
     () =>
-      PAID_MODELS.filter((m) =>
-        m.toLowerCase().includes(search.trim().toLowerCase()),
+      catalog.filter(
+        (m) =>
+          !m.free &&
+          m.name.toLowerCase().includes(search.trim().toLowerCase()),
       ),
-    [search],
+    [catalog, search],
   )
 
   const handlePasteKey = async () => {
@@ -150,53 +162,72 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
     }
   }
 
-  const handleCopyModel = async (id: string) => {
+  const loadModels = async (key: string, base: string) => {
+    setLoadingModels(true)
     try {
-      await navigator.clipboard.writeText(id)
-      setCopiedModel(id)
-      window.setTimeout(() => {
-        setCopiedModel((cur) => (cur === id ? null : cur))
-      }, 1600)
+      const res = await fetch('/api/settings/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, apiKey: key, customBaseUrl: base }),
+      })
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        const list: ModelEntry[] = data.models ?? []
+        setCatalog(list)
+        setCatalogMeta({ total: data.total ?? list.length, free: data.free ?? 0 })
+        setModelsError(null)
+        if (!list.some((m) => m.id === model)) {
+          setModel(list[0]?.id ?? '')
+        }
+      } else {
+        setModelsError(data.error || 'Could not load the model catalog — try Re-validate.')
+        toast.error('Could not load models', { description: data.error || 'Try re-validating.' })
+      }
     } catch {
-      toast.error('Copy failed', { description: 'Clipboard is unavailable right now.' })
+      setModelsError('Network error while fetching models.')
+      toast.error('Network error', { description: 'Could not reach the catalog endpoint.' })
+    } finally {
+      setLoadingModels(false)
     }
   }
 
-  const handleTestConnection = async () => {
+  const handleValidate = async () => {
     if (!apiKey.trim()) {
       toast.warning('API key required', {
-        description: `Paste your ${meta.label} key to test the connection.`,
+        description: `Paste your ${meta.label} key first.`,
       })
       return
     }
-    setTestState('testing')
-    setTestError(null)
+
+    setStage('validating')
+    setStatusMsg(`Validating ${meta.label} key…`)
     setLatency(null)
 
     try {
       const res = await fetch('/api/settings/test-connection', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ provider, apiKey, model, customBaseUrl: baseUrl }),
+        body: JSON.stringify({ provider, apiKey, customBaseUrl: baseUrl }),
       })
       const data = await res.json()
 
-      if (res.ok && data.success) {
-        setTestState('connected')
-        setLatency(data.latency || '~120ms')
-        toast.success('Connection verified', {
-          description: `Key is valid · ${data.latency ?? '~120ms'} round-trip`,
-        })
+      if (data.success) {
+        setStage('connected')
+        setLatency(data.latency || null)
+        setDetectedProvider(data.provider || null)
+        setStatusMsg(`${meta.label} key verified`)
+        await loadModels(apiKey.trim(), baseUrl)
       } else {
-        setTestState('error')
-        setTestError(data.error || 'Invalid key or unreachable model')
-        toast.error('Connection failed', {
-          description: data.error || 'The provider rejected this key/model pair.',
+        setStage('error')
+        setStatusMsg(data.error || 'The provider rejected this key.')
+        toast.error('Validation failed', {
+          description: data.error || 'Check the key and try again.',
         })
       }
     } catch {
-      setTestState('error')
-      setTestError('Network error')
+      setStage('error')
+      setStatusMsg('Network error — could not reach the validation endpoint.')
       toast.error('Network error', { description: 'Could not reach the validation endpoint.' })
     }
   }
@@ -231,6 +262,9 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
       setIsSaving(false)
     }
   }
+
+  const canValidate = apiKey.trim().length > 0 && stage !== 'validating'
+  const canSave = stage === 'connected' && !!model && !isSaving
 
   return (
     <AnimatePresence>
@@ -279,47 +313,52 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
 
             {/* Body */}
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
-              {/* Live connection status */}
+              {/* Live status strip */}
               <motion.div
                 initial={false}
                 animate={{
                   backgroundColor:
-                    testState === 'connected'
+                    stage === 'connected'
                       ? 'rgba(20, 158, 83, 0.09)'
-                      : testState === 'error'
+                      : stage === 'error'
                         ? 'rgba(220, 54, 46, 0.08)'
-                        : 'rgba(24, 28, 38, 0.04)',
+                        : stage === 'validating'
+                          ? 'rgba(10, 102, 255, 0.06)'
+                          : 'rgba(24, 28, 38, 0.04)',
                   borderColor:
-                    testState === 'connected'
+                    stage === 'connected'
                       ? 'rgba(20, 158, 83, 0.3)'
-                      : testState === 'error'
+                      : stage === 'error'
                         ? 'rgba(220, 54, 46, 0.28)'
-                        : 'var(--border)',
+                        : stage === 'validating'
+                          ? 'rgba(10, 102, 255, 0.25)'
+                          : 'var(--border)',
                 }}
                 transition={{ duration: 0.35 }}
                 className="flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5"
               >
-                <StatusIcon state={testState} />
+                <StatusIcon stage={stage} />
                 <div className="min-w-0 flex-1">
                   <p
                     className={`text-xs font-bold ${
-                      testState === 'connected'
+                      stage === 'connected'
                         ? 'text-[var(--success)]'
-                        : testState === 'error'
+                        : stage === 'error'
                           ? 'text-[var(--error)]'
                           : 'text-[var(--foreground-secondary)]'
                     }`}
                   >
-                    {testState === 'connected' && 'Connected'}
-                    {testState === 'testing' && 'Testing connection…'}
-                    {testState === 'error' && 'Connection failed'}
-                    {testState === 'idle' && 'Not connected'}
+                    {stage === 'connected' && statusMsg}
+                    {stage === 'validating' && statusMsg}
+                    {stage === 'error' && 'Connection failed'}
+                    {stage === 'idle' && 'Not validated'}
                   </p>
                   <p className="truncate text-[10.5px] text-[var(--muted-foreground)]">
-                    {testState === 'connected' && `${meta.label} · ${latency} round-trip · ${model}`}
-                    {testState === 'testing' && `Handshaking with ${meta.label}…`}
-                    {testState === 'error' && (testError ?? 'Check your key and try again')}
-                    {testState === 'idle' && 'Verify a key below to activate AI routing.'}
+                    {stage === 'connected' &&
+                      `${latency ? `${latency} round-trip` : 'verified'}${detectedProvider ? ` · routed via ${detectedProvider}` : ''}`}
+                    {(stage === 'idle' || stage === 'validating') &&
+                      (stage === 'validating' ? 'Handshaking with the provider…' : 'Paste your key, then validate to unlock live models.')}
+                    {stage === 'error' && statusMsg}
                   </p>
                 </div>
               </motion.div>
@@ -391,6 +430,9 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                         onChange={(e) => updateCredentials({ baseUrl: e.target.value })}
                         className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 font-mono-code text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none transition-all duration-200 focus:border-[var(--brand)] focus:shadow-[0_0_0_3px_var(--brand-soft)]"
                       />
+                      <p className="text-[10px] text-[var(--muted-foreground)]">
+                        Leave empty when pasting an Anthropic (<code className="font-mono-code">sk-ant-</code>) or OpenRouter key — we detect it automatically.
+                      </p>
                     </fieldset>
                   </motion.div>
                 )}
@@ -439,82 +481,136 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                 </div>
               </section>
 
-              {/* Model selection */}
+              {/* Model routing — fully dynamic */}
               <section className="space-y-2">
-                <SectionLabel icon={<TbCpu className="h-3 w-3" />}>Model Routing</SectionLabel>
+                <SectionLabel
+                  icon={<TbCpu className="h-3 w-3" />}
+                  aside={
+                    catalog.length > 0 ? (
+                      <span className="normal-case tracking-normal font-semibold text-[var(--muted-foreground)]">
+                        {catalogMeta.free} free · {catalogMeta.total} total
+                      </span>
+                    ) : undefined
+                  }
+                >
+                  Model Routing
+                </SectionLabel>
 
-                {/* Search */}
-                <div className="relative">
-                  <TbSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Filter models…"
-                    className={`${inputCls} pl-9 pr-9`}
-                    spellCheck={false}
-                  />
-                  {search && (
-                    <button
-                      type="button"
-                      onClick={() => setSearch('')}
-                      aria-label="Clear filter"
-                      className="pressable absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                    >
-                      <TbX className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
+                {stage !== 'connected' && (
+                  <div className="rounded-xl border border-dashed border-[var(--border-strong)] px-3 py-5 text-center">
+                    <TbCpu className="mx-auto h-5 w-5 text-[var(--muted-foreground)] opacity-60" />
+                    <p className="mt-1.5 text-[11.5px] font-medium text-[var(--muted-foreground)]">
+                      Validate your key below to load the{' '}
+                      <span className="font-bold text-[var(--foreground-secondary)]">live model catalog</span>
+                    </p>
+                  </div>
+                )}
 
-                {(freeModels.length > 0 || paidModels.length > 0) && (
+                {loadingModels && (
+                  <div className="space-y-1.5">
+                    {[0, 1, 2, 3].map((i) => (
+                      <div
+                        key={i}
+                        className="h-9 animate-pulse rounded-xl bg-[var(--brand-soft)]"
+                        style={{ animationDelay: `${i * 120}ms`, opacity: 1 - i * 0.18 }}
+                      />
+                    ))}
+                    <p className="pt-1 text-center text-[11px] font-medium text-[var(--brand)]">
+                      Fetching live models…
+                    </p>
+                  </div>
+                )}
+
+                {stage === 'connected' && !loadingModels && catalog.length > 0 && (
                   <>
+                    {/* Search */}
+                    <div className="relative">
+                      <TbSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                      <input
+                        type="text"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        placeholder="Filter models…"
+                        className={`${inputCls} pl-9 pr-9`}
+                        spellCheck={false}
+                      />
+                      {search && (
+                        <button
+                          type="button"
+                          onClick={() => setSearch('')}
+                          aria-label="Clear filter"
+                          className="pressable absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                        >
+                          <TbX className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+
                     {freeModels.length > 0 && (
                       <div className="space-y-1.5 pt-1">
                         <p className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--success)]">
-                          <TbBolt className="h-3 w-3" /> ZERO-COST TIERS
+                          <TbBolt className="h-3 w-3" /> FREE MODELS FIRST
                         </p>
-                        {freeModels.map((m) => (
+                        {freeModels.slice(0, 8).map((m) => (
                           <ModelRow
-                            key={m}
-                            model={m}
-                            selected={model === m}
-                            onSelect={() => {
-                              setModel(m)
-                              setTestState('idle')
-                            }}
-                            copied={copiedModel === m}
-                            onCopy={() => handleCopyModel(m)}
+                            key={m.id}
+                            entry={m}
+                            selected={model === m.id}
+                            onSelect={() => setModel(m.id)}
+                            copied={copiedModel === m.id}
+                            onCopy={() => handleCopyModel(m.id)}
                           />
                         ))}
+                        {freeModels.length > 8 && (
+                          <p className="pl-1 text-[10px] italic text-[var(--muted-foreground)]">
+                            +{freeModels.length - 8} more free — refine the search
+                          </p>
+                        )}
                       </div>
                     )}
 
-                    {paidModels.length > 0 && (
+                    {otherModels.length > 0 && (
                       <div className="space-y-1.5 pt-2">
-                        <p className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--muted-foreground)]">
-                          <TbRocket className="h-3 w-3" /> PREMIUM / HIGHER CONTEXT
+                        <p className="text-[10px] font-bold text-[var(--muted-foreground)]">
+                          ALL MODELS{freeModels.length > 0 && search ? '' : ' · PAID / STANDARD'}
                         </p>
-                        {paidModels.map((m) => (
+                        {otherModels.slice(0, 40).map((m) => (
                           <ModelRow
-                            key={m}
-                            model={m}
-                            selected={model === m}
-                            onSelect={() => {
-                              setModel(m)
-                              setTestState('idle')
-                            }}
-                            copied={copiedModel === m}
-                            onCopy={() => handleCopyModel(m)}
+                            key={m.id}
+                            entry={m}
+                            selected={model === m.id}
+                            onSelect={() => setModel(m.id)}
+                            copied={copiedModel === m.id}
+                            onCopy={() => handleCopyModel(m.id)}
                           />
                         ))}
+                        {otherModels.length > 40 && (
+                          <p className="pl-1 text-[10px] italic text-[var(--muted-foreground)]">
+                            Showing 40 of {otherModels.length} — refine the search to see more
+                          </p>
+                        )}
                       </div>
+                    )}
+
+                    {freeModels.length === 0 && otherModels.length === 0 && (
+                      <p className="anim-fade-in rounded-xl border border-dashed border-[var(--border-strong)] px-3 py-4 text-center text-[11px] text-[var(--muted-foreground)]">
+                        No models match “{search.trim()}”.
+                      </p>
                     )}
                   </>
                 )}
 
-                {freeModels.length === 0 && paidModels.length === 0 && (
-                  <p className="anim-fade-in rounded-xl border border-dashed border-[var(--border-strong)] px-3 py-4 text-center text-[11px] text-[var(--muted-foreground)]">
-                    No models match “{search.trim()}”.
+                {modelsError && stage === 'connected' && (
+                  <div className="flex items-center gap-2 rounded-xl border border-[var(--error)]/25 bg-[var(--error-soft)] px-3 py-2.5">
+                    <TbAlertTriangleFilled className="h-4 w-4 shrink-0 text-[var(--error)]" />
+                    <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--error)]">{modelsError}</p>
+                  </div>
+                )}
+
+                {model && stage === 'connected' && catalog.length > 0 && (
+                  <p className="flex items-center gap-1.5 px-1 pt-1 font-mono-code text-[10px] text-[var(--muted-foreground)]">
+                    <TbCheck className="h-3 w-3 shrink-0 text-[var(--success)]" />
+                    routing tasks via <span className="truncate font-semibold text-[var(--foreground-secondary)]">{model}</span>
                   </p>
                 )}
               </section>
@@ -523,22 +619,23 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
             {/* Footer actions */}
             <div className="flex gap-2.5 border-t border-[var(--border)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <button
-                onClick={handleTestConnection}
-                disabled={testState === 'testing'}
+                onClick={handleValidate}
+                disabled={!canValidate}
+                title={!apiKey.trim() ? 'Paste your API key first' : undefined}
                 className="pressable flex flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] py-2.5 text-xs font-semibold text-[var(--foreground)] hover:border-[var(--brand)] disabled:opacity-50"
               >
-                {testState === 'testing' ? (
+                {stage === 'validating' ? (
                   <TbLoaderQuarter className="h-4 w-4 animate-spin text-[var(--brand)]" />
                 ) : (
                   <TbActivity className="h-4 w-4 text-[var(--brand)]" />
                 )}
-                Test Connection
+                {stage === 'connected' ? 'Re-validate' : 'Validate Key'}
               </button>
 
               <button
                 onClick={handleSave}
-                disabled={testState !== 'connected' || isSaving}
-                title={testState !== 'connected' ? 'Run a successful connection test first' : undefined}
+                disabled={!canSave}
+                title={!canSave ? (stage !== 'connected' ? 'Validate the key first' : 'Pick a model') : undefined}
                 className="btn-brand pressable flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold"
               >
                 {isSaving ? (
@@ -554,23 +651,31 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
       )}
     </AnimatePresence>
   )
+
+  async function handleCopyModel(id: string) {
+    try {
+      await navigator.clipboard.writeText(id)
+      setCopiedModel(id)
+      window.setTimeout(() => {
+        setCopiedModel((cur) => (cur === id ? null : cur))
+      }, 1600)
+    } catch {
+      /* clipboard unavailable */
+    }
+  }
 }
 
-function StatusIcon({ state }: { state: TestState }) {
-  if (state === 'connected') {
-    return (
-      <span className="live-dot mx-1.5" aria-hidden />
-    )
+function StatusIcon({ stage }: { stage: VaultStage }) {
+  if (stage === 'connected') {
+    return <span className="live-dot mx-1.5" aria-hidden />
   }
-  if (state === 'testing') {
+  if (stage === 'validating') {
     return <TbLoaderQuarter className="h-4.5 w-4.5 shrink-0 animate-spin text-[var(--brand)]" />
   }
-  if (state === 'error') {
+  if (stage === 'error') {
     return <TbAlertTriangleFilled className="h-4.5 w-4.5 shrink-0 text-[var(--error)]" />
   }
-  return (
-    <span className="mx-1.5 block h-2 w-2 shrink-0 rounded-full bg-[var(--muted-foreground)]" aria-hidden />
-  )
+  return <span className="mx-1.5 block h-2 w-2 shrink-0 rounded-full bg-[var(--muted-foreground)]" aria-hidden />
 }
 
 function SectionLabel({
@@ -597,20 +702,18 @@ const inputCls =
   'w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none transition-all duration-200 focus:border-[var(--brand)] focus:shadow-[0_0_0_3px_var(--brand-soft)]'
 
 function ModelRow({
-  model,
+  entry,
   selected,
   onSelect,
   copied,
   onCopy,
 }: {
-  model: string
+  entry: ModelEntry
   selected: boolean
   onSelect: () => void
   copied: boolean
   onCopy: () => void
 }) {
-  const free = model.endsWith(':free')
-
   return (
     <div
       role="radio"
@@ -634,10 +737,11 @@ function ModelRow({
           className={`truncate font-mono-code text-[10.5px] ${
             selected ? 'font-semibold text-[var(--foreground)]' : 'text-[var(--foreground-secondary)]'
           }`}
+          title={entry.name}
         >
-          {model}
+          {entry.name}
         </code>
-        {free && !selected && (
+        {entry.free && !selected && (
           <span className="shrink-0 rounded-full bg-[var(--success-soft)] px-1.5 py-px text-[8px] font-bold uppercase tracking-wide text-[var(--success)]">
             Free
           </span>
@@ -647,15 +751,15 @@ function ModelRow({
       <span className="ml-2 flex shrink-0 items-center gap-1">
         <button
           type="button"
-          aria-label={copied ? 'Copied' : `Copy ${model}`}
+          aria-label={copied ? 'Copied' : `Copy ${entry.id}`}
           onClick={(e) => {
             e.stopPropagation()
             onCopy()
           }}
           className={`pressable rounded-md p-1 transition-opacity ${
             copied
-              ? 'text-[var(--success)]'
-              : 'text-[var(--muted-foreground)] opacity-0 hover:text-[var(--foreground)] focus-visible:opacity-100 group-hover:opacity-100 md:opacity-0'
+              ? 'text-[var(--success)] opacity-100'
+              : 'text-[var(--muted-foreground)] opacity-60 hover:text-[var(--foreground)] group-hover:opacity-100'
           }`}
         >
           {copied ? <TbCheck className="h-3.5 w-3.5" /> : <TbCopy className="h-3.5 w-3.5" />}
