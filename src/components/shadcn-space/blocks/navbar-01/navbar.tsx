@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { NavigationMenu, NavigationMenuItem, NavigationMenuLink, NavigationMenuList } from "@/components/ui/navigation-menu";
@@ -39,12 +39,12 @@ const SignInButton = ({ className }: { className?: string }) => {
     <Button
       onClick={signInWithGitHub}
       className={cn(
-        "relative text-sm font-semibold rounded-full h-10 p-1 ps-5 pe-12 group transition-all duration-500 hover:ps-12 hover:pe-5 w-fit overflow-hidden",
+        "relative text-sm font-semibold rounded-full h-10 p-1 ps-5 pe-12 group transition-all duration-500 hover:ps-12 hover:pe-5 w-fit overflow-hidden bg-white text-[#14161c] hover:bg-slate-200",
         className,
       )}
     >
       <span className="relative z-10 transition-all duration-500 hover:cursor-pointer">Sign in</span>
-      <div className="absolute right-1 w-8 h-8 bg-background text-foreground rounded-full flex items-center justify-center transition-all duration-500 group-hover:right-[calc(100%-36px)] group-hover:rotate-45">
+      <div className="absolute right-1 w-8 h-8 bg-[#14161c] text-white rounded-full flex items-center justify-center transition-all duration-500 group-hover:right-[calc(100%-36px)] group-hover:rotate-45">
         <GithubIcon className="h-4 w-4" />
       </div>
     </Button>
@@ -58,9 +58,9 @@ const WayCodeLogo = () => (
       alt="WayCode logo"
       width={32}
       height={32}
-      className="h-8 w-8 rounded-xl object-cover"
+      className="h-8 w-8 rounded-xl object-cover ring-1 ring-white/15"
     />
-    <span className="text-[17px] font-extrabold tracking-tight text-gradient-brand">WayCode</span>
+    <span className="text-[17px] font-extrabold tracking-tight text-white">WayCode</span>
   </a>
 );
 
@@ -88,8 +88,8 @@ const Navbar = () => {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 transition-all duration-300",
-        sticky ? "bg-white/70 backdrop-blur-xl border-b border-black/[0.05]" : "bg-transparent",
+        "sticky top-0 z-50 border-b transition-all duration-300",
+        sticky ? "border-white/[0.08] bg-[#14161c]/90 backdrop-blur-xl" : "border-transparent bg-[#14161c]",
       )}
     >
       <div id="top" />
@@ -103,13 +103,13 @@ const Navbar = () => {
           )}
         >
           <WayCodeLogo />
-          <NavigationMenu className="max-lg:hidden bg-muted p-0.5 rounded-full">
+          <NavigationMenu className="max-lg:hidden bg-white/[0.07] p-0.5 rounded-full">
             <NavigationMenuList className="flex gap-0">
               {navigationData.map((navItem) => (
                 <NavigationMenuItem key={navItem.title}>
                   <NavigationMenuLink
                     href={navItem.href}
-                    className="px-2 lg:px-4 py-2 text-sm font-medium rounded-full text-muted-foreground hover:text-foreground hover:bg-background outline outline-transparent hover:outline-border hover:shadow-xs transition tracking-normal"
+                    className="px-2 lg:px-4 py-2 text-sm font-medium rounded-full text-slate-300 hover:text-white hover:bg-white/10 outline outline-transparent hover:outline-white/15 hover:shadow-xs transition tracking-normal"
                   >
                     {navItem.title}
                   </NavigationMenuLink>
@@ -122,15 +122,15 @@ const Navbar = () => {
 
           <div className="sm:hidden flex items-center gap-2">
             <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-              <DropdownMenuTrigger className="rounded-full bg-background border border-border p-2 outline-none flex items-center justify-center cursor-pointer transition-colors">
+              <DropdownMenuTrigger className="rounded-full bg-white/[0.07] border border-white/10 text-white p-2 outline-none flex items-center justify-center cursor-pointer transition-colors">
                 <TextAlignJustify size={20} />
                 <span className="sr-only">Menu</span>
               </DropdownMenuTrigger>
 
-              <DropdownMenuContent align="end" className="w-56 mt-2">
+              <DropdownMenuContent align="end" className="w-56 mt-2 bg-[#1d2027] border-white/10 text-slate-200">
                 {navigationData.map((item) => (
                   <DropdownMenuItem key={item.title}>
-                    <a href={item.href} className="w-full cursor-pointer text-sm font-medium">
+                    <a href={item.href} className="w-full cursor-pointer text-sm font-medium hover:text-white">
                       {item.title}
                     </a>
                   </DropdownMenuItem>
