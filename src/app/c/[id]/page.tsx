@@ -27,6 +27,18 @@ export default async function ConversationPage({
     .maybeSingle()
   if (!conversation) redirect('/')
 
+  // repo_id is a fragile FK — repo re-syncs can null it. repo_name (the stable
+  // GitHub full name) is the fallback used to re-anchor the composer.
+  let repoId = conversation.repo_id
+  if (!repoId && conversation.repo_name) {
+    const { data: repo } = await supabase
+      .from('repositories')
+      .select('id')
+      .eq('repo_name', conversation.repo_name)
+      .maybeSingle()
+    repoId = repo?.id ?? null
+  }
+
   const { data: repositories } = await supabase
     .from('repositories')
     .select('*')
@@ -41,7 +53,7 @@ export default async function ConversationPage({
       <ConversationChat
         conversation={{
           id: conversation.id,
-          repoId: conversation.repo_id,
+          repoId,
           repoName: conversation.repo_name,
         }}
       />

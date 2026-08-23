@@ -70,13 +70,17 @@ export async function POST() {
     }
 
     if (repos.length > 0) {
-      // Clear old repositories and insert freshly synced ones
-      await supabase
+      // Upsert — never delete-and-reinsert. Repository rows are referenced by
+      // task_jobs and conversations via FK (ON DELETE SET NULL), so recycling
+      // rows on every sync silently detached chats and tasks from their repos.
+      const { data: existing } = await supabase
         .from('repositories')
-        .delete()
+        .select('id, repo_name')
         .eq('user_id', user.id)
+      const idByName = new Map((existing ?? []).map((r) => [r.repo_name, r.id]))
 
       const repoRows = repos.map((r) => ({
+        ...(idByName.has(r.full_name) ? { id: idByName.get(r.full_name) } : {}),
         user_id: user.id,
         repo_name: r.full_name,
         default_branch: r.default_branch || 'main',

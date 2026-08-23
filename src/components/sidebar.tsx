@@ -118,9 +118,14 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             repositories.map((repo, i) => {
               const shortName = repo.repo_name.split('/')[1] || repo.repo_name
               const isSelected = selectedRepo?.id === repo.id
-              const repoChats = conversations.filter((c) => c.repo_id === repo.id)
+              // repo_id is a fragile FK (repo re-syncs can recycle ids and null it),
+              // so repo_name — the stable GitHub full name — is the primary match.
+              const chatBelongs = (c: ConversationItem) =>
+                c.repo_name ? c.repo_name === repo.repo_name : c.repo_id === repo.id
+              const repoChats = conversations.filter(chatBelongs)
               const isExpanded =
-                expandedId === undefined ? isSelected || activeConversation?.repo_id === repo.id : expandedId === repo.id
+                expandedId === undefined ? isSelected || (activeConversation ? chatBelongs(activeConversation) : false) : expandedId === repo.id
+              const activeBelongsHere = activeConversation ? chatBelongs(activeConversation) : false
 
               return (
                 <motion.div
@@ -137,7 +142,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                       setExpandedId(isExpanded ? null : repo.id)
                       // Opening a different repo's canvas while inside another
                       // repo's thread starts a NEW chat with that repo.
-                      if (pathname.startsWith('/c/') && activeConversation?.repo_id !== repo.id) {
+                      if (pathname.startsWith('/c/') && !activeBelongsHere) {
                         router.push('/')
                       }
                     }}
@@ -219,14 +224,14 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             })
           )}
 
-          {/* Threads without a repository (legacy) */}
-          {conversations.some((c) => !c.repo_id) && (
+          {/* Threads with no repository link at all (truly orphaned) */}
+          {conversations.some((c) => !c.repo_id && !c.repo_name) && (
             <div className="mt-2 border-t border-[var(--chrome-border)] pt-2">
               <span className="mb-1 block px-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--chrome-text-muted)]">
                 Chats
               </span>
               {conversations
-                .filter((c) => !c.repo_id)
+                .filter((c) => !c.repo_id && !c.repo_name)
                 .map((conv) => {
                   const isActive = pathname === `/c/${conv.id}`
                   return (
