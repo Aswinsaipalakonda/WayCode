@@ -93,7 +93,7 @@ export function DiffReviewModal({ isOpen, onClose, taskId, branchName, diffConte
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 60, opacity: 0, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-            className="relative flex max-h-[92vh] sm:max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[24px] sm:rounded-[24px] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-lg)]"
+            className="relative flex h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-[24px] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-lg)] sm:h-[min(85vh,780px)] sm:rounded-[24px]"
           >
             {/* Header */}
             <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
@@ -143,7 +143,7 @@ export function DiffReviewModal({ isOpen, onClose, taskId, branchName, diffConte
                       initial={{ opacity: 0, x: -6 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: Math.min(idx * 0.008, 0.4), duration: 0.25 }}
-                      className={`-mx-2 rounded px-2 ${cls}`}
+                      className={`-mx-2 whitespace-pre-wrap break-words rounded px-2 ${cls}`}
                     >
                       {line || ' '}
                     </motion.div>

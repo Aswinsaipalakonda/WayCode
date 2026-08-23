@@ -104,14 +104,17 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
 
   // History hydration should land the user on the LATEST message instantly,
   // like ChatGPT — smooth-scrolling a long restored thread feels like drift.
+  // The jump (plus a settle re-anchor) is executed by the scroll effect below;
+  // this effect only flags it, keeping its dep array size constant.
   const jumpPendingRef = useRef(false)
   useEffect(() => {
     if (jumpPendingRef.current) {
       jumpPendingRef.current = false
       scrollToBottom(false)
-    } else {
-      scrollToBottom()
+      const settle = window.setTimeout(() => scrollToBottom(false), 400)
+      return () => window.clearTimeout(settle)
     }
+    scrollToBottom()
   }, [messages.length, isSubmitting, scrollToBottom])
 
   // Conversation pages restore their persisted thread; the home canvas never
@@ -150,13 +153,8 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
         }
 
         // Merge instead of replace — never clobber messages sent mid-hydration.
-        if (restored.length > 0) {
-          jumpPendingRef.current = true
-          // TaskCards expand as their data streams in — re-anchor after settle.
-          window.setTimeout(() => {
-            if (!cancelled) scrollToBottom(false)
-          }, 400)
-        }
+        // The scroll effect performs the instant jump + settle re-anchor.
+        if (restored.length > 0) jumpPendingRef.current = true
         setMessages((prev) => {
           const seen = new Set(prev.map((m) => m.id))
           return [...restored.filter((m) => !seen.has(m.id)), ...prev]
@@ -171,7 +169,7 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
     return () => {
       cancelled = true
     }
-  }, [user, conversationId, scrollToBottom])
+  }, [user, conversationId])
 
   // Opening an older thread should aim the composer at that thread's repository.
   const conversationRepoId = conversation?.repoId ?? null
@@ -660,8 +658,8 @@ function TaskCard({ task }: { task: QueuedTask }) {
               {taskActive && (
                 <span className="absolute inset-0 animate-ping rounded-full bg-[var(--brand)] opacity-20" aria-hidden />
               )}
-              <span className="relative flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white shadow-[var(--shadow-sm)]">
-                <Image src="/logo.png" alt="" width={18} height={18} className="object-contain" />
+              <span className="relative flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-black shadow-[var(--shadow-sm)]">
+                <Image src="/logo.png" alt="" width={24} height={24} className="object-contain" />
               </span>
             </span>
             <div className="min-w-0">
