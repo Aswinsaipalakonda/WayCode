@@ -23,6 +23,7 @@ import {
   TbClipboardText,
   TbKey,
   TbTrash,
+  TbListDetails,
 } from 'react-icons/tb'
 
 interface SettingsDrawerProps {
@@ -116,6 +117,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
   const [savedVault, setSavedVault] = useState<SavedVault | null>(null)
   const [replacingKey, setReplacingKey] = useState(false)
   const [isRemoving, setIsRemoving] = useState(false)
+  const [modelPicker, setModelPicker] = useState<null | 'free' | 'all'>(null)
 
   const meta = PROVIDERS.find((p) => p.id === provider)!
   const { apiKey, baseUrl } = credentials[provider]
@@ -425,9 +427,10 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
   const canSave = stage === 'connected' && !!model && !isSaving
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 flex justify-end">
+    <>
+      <AnimatePresence>
+        {isOpen && (
+          <div className="fixed inset-0 z-50 flex justify-end">
           {/* Scrim */}
           <motion.button
             aria-label="Close settings"
@@ -778,9 +781,14 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                           />
                         ))}
                         {freeModels.length > 8 && (
-                          <p className="pl-1 text-[10px] italic text-[var(--muted-foreground)]">
-                            +{freeModels.length - 8} more free — refine the search
-                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setModelPicker('free')}
+                            className="pressable flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--brand)]/35 py-2 text-[11px] font-bold text-[var(--brand)] transition-colors hover:bg-[var(--brand-soft)]"
+                          >
+                            <TbListDetails className="h-3.5 w-3.5" />
+                            See all {freeModels.length} free models
+                          </button>
                         )}
                       </div>
                     )}
@@ -801,9 +809,14 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                           />
                         ))}
                         {otherModels.length > 40 && (
-                          <p className="pl-1 text-[10px] italic text-[var(--muted-foreground)]">
-                            Showing 40 of {otherModels.length} — refine the search to see more
-                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setModelPicker('all')}
+                            className="pressable flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--border-strong)] py-2 text-[11px] font-bold text-[var(--foreground-secondary)] transition-colors hover:bg-[var(--card-hover)]"
+                          >
+                            <TbListDetails className="h-3.5 w-3.5" />
+                            See all {otherModels.length} models
+                          </button>
                         )}
                       </div>
                     )}
@@ -865,7 +878,22 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+      </AnimatePresence>
+
+      <ModelPickerModal
+        key={modelPicker ?? 'closed'}
+        mode={modelPicker}
+        onClose={() => setModelPicker(null)}
+        catalog={catalog}
+        selected={model}
+        onSelect={(id) => {
+          setModel(id)
+          setModelPicker(null)
+        }}
+        copiedModel={copiedModel}
+        onCopy={handleCopyModel}
+      />
+    </>
   )
 
   async function handleCopyModel(id: string) {
@@ -983,5 +1011,138 @@ function ModelRow({
         {selected && <TbCircleCheckFilled className="h-4 w-4 shrink-0 text-[var(--brand)]" />}
       </span>
     </div>
+  )
+}
+
+/**
+ * Full-catalog picker — RepoPicker-style bottom sheet listing every free
+ * (or every) model for the connected provider, with its own search.
+ */
+function ModelPickerModal({
+  mode,
+  onClose,
+  catalog,
+  selected,
+  onSelect,
+  copiedModel,
+  onCopy,
+}: {
+  mode: 'free' | 'all' | null
+  onClose: () => void
+  catalog: ModelEntry[]
+  selected: string
+  onSelect: (id: string) => void
+  copiedModel: string | null
+  onCopy: (id: string) => void
+}) {
+  const [query, setQuery] = useState('')
+
+  const list = useMemo(() => {
+    const base = mode === 'free' ? catalog.filter((m) => m.free) : catalog
+    const q = query.trim().toLowerCase()
+    if (!q) return base
+    return base.filter((m) => m.name.toLowerCase().includes(q) || m.id.toLowerCase().includes(q))
+  }, [mode, catalog, query])
+
+  return (
+    <AnimatePresence>
+      {mode && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center sm:justify-center sm:p-6">
+          <motion.button
+            aria-label="Close"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            onClick={onClose}
+            className="absolute inset-0 bg-[rgba(24,30,44,0.35)] backdrop-blur-[4px]"
+          />
+
+          <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label={mode === 'free' ? 'All free models' : 'All models'}
+            initial={{ y: '42%', opacity: 0.6 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: '55%', opacity: 0.4 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+            className="relative flex max-h-[76vh] w-full flex-col overflow-hidden rounded-t-[28px] bg-white shadow-[var(--shadow-lg)] sm:max-w-md sm:rounded-[28px]"
+          >
+            {/* Grab handle (mobile) */}
+            <div className="flex justify-center pb-1 pt-3 sm:hidden">
+              <span className="h-1 w-9 rounded-full bg-[rgba(18,22,33,0.14)]" />
+            </div>
+
+            <div className="flex items-center justify-between px-5 pb-3 pt-1 sm:pt-5">
+              <div>
+                <h2 className="flex items-center gap-1.5 text-[15px] font-bold tracking-tight">
+                  {mode === 'free' ? (
+                    <>
+                      <TbBolt className="h-4 w-4 text-[var(--success)]" /> Free models
+                    </>
+                  ) : (
+                    'All models'
+                  )}
+                </h2>
+                <p className="mt-0.5 text-xs text-[var(--muted-foreground)]">
+                  {list.length} of {mode === 'free' ? catalog.filter((m) => m.free).length : catalog.length} models
+                  {selected && ' · tap one to route tasks through it'}
+                </p>
+              </div>
+              <button
+                onClick={onClose}
+                aria-label="Close"
+                className="pressable rounded-full p-2 text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--foreground)]"
+              >
+                <TbX className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="px-4 pb-3">
+              <div className="relative">
+                <TbSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder={mode === 'free' ? 'Filter free models…' : 'Filter models…'}
+                  className={`${inputCls} py-2 pl-9 pr-9 text-[13px]`}
+                  spellCheck={false}
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery('')}
+                    aria-label="Clear filter"
+                    className="pressable absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                  >
+                    <TbX className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 pb-4">
+              {list.length === 0 ? (
+                <p className="anim-fade-in rounded-xl border border-dashed border-[var(--border-strong)] px-3 py-6 text-center text-[11.5px] text-[var(--muted-foreground)]">
+                  No models match “{query.trim()}”.
+                </p>
+              ) : (
+                list.map((m) => (
+                  <ModelRow
+                    key={m.id}
+                    entry={m}
+                    selected={selected === m.id}
+                    onSelect={() => onSelect(m.id)}
+                    copied={copiedModel === m.id}
+                    onCopy={() => onCopy(m.id)}
+                  />
+                ))
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   )
 }

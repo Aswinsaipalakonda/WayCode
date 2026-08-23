@@ -593,6 +593,19 @@ function TaskCard({ task }: { task: QueuedTask }) {
   const reviewable =
     !!diffContent && ['verifying', 'build_verified', 'completed', 'success'].includes(statusLower)
   const failed = statusLower === 'failed'
+  const taskActive = !['completed', 'success', 'failed', 'rejected'].includes(statusLower)
+  const subtitle =
+    statusLower === 'failed'
+      ? 'Needs manual attention'
+      : statusLower === 'rejected'
+        ? 'Changes discarded'
+        : ['completed', 'success'].includes(statusLower)
+          ? 'Finished — changes on the working branch'
+          : statusLower === 'verifying'
+            ? 'Verifying the build…'
+            : statusLower === 'processing'
+              ? 'Generating changes…'
+              : 'Queued for the build daemon…'
 
   // Map raw status → pipeline stage index.
   const stepIndex = ['completed', 'success'].includes(statusLower)
@@ -625,28 +638,22 @@ function TaskCard({ task }: { task: QueuedTask }) {
         className="overflow-hidden rounded-[24px] border border-black/[0.05] bg-white/90 shadow-[var(--shadow-md)] backdrop-blur"
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-4 pt-3.5 pb-2">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] p-[1.5px]">
-              <span className="flex h-full w-full items-center justify-center rounded-[10px] bg-white">
-                <Image src="/logo.png" alt="" width={15} height={15} className="object-contain" />
+        <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="relative shrink-0">
+              {taskActive && (
+                <span className="absolute inset-0 animate-ping rounded-2xl bg-[var(--brand)] opacity-20" aria-hidden />
+              )}
+              <span className="relative flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] shadow-[0_6px_16px_-6px_var(--brand-glow)]">
+                <Image src="/logo.png" alt="" width={17} height={17} className="object-contain brightness-0 invert" />
               </span>
             </span>
-            <div className="group/id min-w-0">
-              <p className="truncate text-[13px] font-bold leading-tight">WayCode Agent</p>
-              <button
-                type="button"
-                onClick={() => copyText('task-id', task.taskId)}
-                title={copiedField === 'task-id' ? 'Copied!' : `Copy task ID · ${task.taskId}`}
-                className="pressable mt-0.5 flex items-center gap-1 rounded font-mono-code text-[9.5px] text-[var(--muted-foreground)] hover:text-[var(--brand)]"
-              >
-                waycode/{task.taskId.slice(0, 12)}
-                {copiedField === 'task-id' ? (
-                  <Check className="h-2.5 w-2.5 text-[var(--success)]" />
-                ) : (
-                  <Copy className="h-2.5 w-2.5 opacity-40 transition-opacity group-hover/id:opacity-100" />
-                )}
-              </button>
+            <div className="min-w-0">
+              <p className="truncate text-[13.5px] font-bold leading-tight tracking-tight">WayCode Agent</p>
+              <p className="mt-0.5 flex items-center gap-1.5 truncate text-[10.5px] font-medium text-[var(--muted-foreground)]">
+                {taskActive && <span className="live-dot" style={{ width: 5, height: 5 }} />}
+                {subtitle}
+              </p>
             </div>
           </div>
           <span
@@ -657,23 +664,36 @@ function TaskCard({ task }: { task: QueuedTask }) {
           </span>
         </div>
 
-        {/* Branch line */}
-        <div className="group/branch flex items-center gap-1.5 px-4 pb-2.5 text-[11px] text-[var(--muted-foreground)]">
-          <GitBranch className="h-3 w-3 shrink-0" />
-          <code className="truncate font-mono-code">{task.branchName}</code>
+        {/* Identity chips — task id + working branch, tap to copy */}
+        <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3.5">
           <button
             type="button"
-            onClick={() => copyText('branch', task.branchName)}
-            aria-label="Copy branch name"
-            title="Copy branch name"
-            className="pressable ml-auto shrink-0 rounded-md p-1 opacity-0 transition-opacity hover:text-[var(--brand)] focus-visible:opacity-100 group-hover/branch:opacity-100"
+            onClick={() => copyText('task-id', task.taskId)}
+            title={copiedField === 'task-id' ? 'Copied!' : `Copy task ID · ${task.taskId}`}
+            className="group/chip pressable flex items-center gap-1.5 rounded-full border border-black/[0.05] bg-black/[0.03] px-2.5 py-1 font-mono-code text-[9.5px] text-[var(--muted-foreground)] transition-colors hover:border-[var(--brand)]/40 hover:text-[var(--brand)]"
           >
-            {copiedField === 'branch' ? (
-              <Check className="h-3 w-3 text-[var(--success)]" />
+            {copiedField === 'task-id' ? (
+              <Check className="h-2.5 w-2.5 text-[var(--success)]" />
             ) : (
-              <Copy className="h-3 w-3" />
+              <Copy className="h-2.5 w-2.5 opacity-50 transition-opacity group-hover/chip:opacity-100" />
             )}
+            waycode/{task.taskId.slice(0, 12)}
           </button>
+          {task.branchName && (
+            <button
+              type="button"
+              onClick={() => copyText('branch', task.branchName)}
+              title={copiedField === 'branch' ? 'Copied!' : 'Copy branch name'}
+              className="group/chip pressable flex items-center gap-1.5 rounded-full border border-black/[0.05] bg-black/[0.03] px-2.5 py-1 font-mono-code text-[9.5px] text-[var(--muted-foreground)] transition-colors hover:border-[var(--brand)]/40 hover:text-[var(--brand)]"
+            >
+              {copiedField === 'branch' ? (
+                <Check className="h-2.5 w-2.5 text-[var(--success)]" />
+              ) : (
+                <GitBranch className="h-2.5 w-2.5 opacity-50 transition-opacity group-hover/chip:opacity-100" />
+              )}
+              <span className="truncate">{task.branchName}</span>
+            </button>
+          )}
         </div>
 
         {/* Pipeline stepper */}
@@ -681,7 +701,7 @@ function TaskCard({ task }: { task: QueuedTask }) {
 
         {/* Live activity */}
         <div className="mx-4 mb-2">
-          <TelemetryStreamer taskId={task.taskId} active={!['completed', 'success', 'failed', 'rejected'].includes(statusLower)} />
+          <TelemetryStreamer taskId={task.taskId} active={taskActive} />
         </div>
 
         {usage.input != null && usage.output != null && usage.input + usage.output > 0 && (

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
 import { toast } from 'sonner'
-import { Plus, History, RefreshCw, ChevronRight, GitBranch, MessageSquare, Settings2, Circle } from 'lucide-react'
+import { Plus, History, RefreshCw, ChevronRight, MessageSquare, Settings2, Circle } from 'lucide-react'
 import { useAppChrome } from '@/components/app-chrome'
 
 interface SidebarProps {
@@ -180,9 +180,8 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                       >
                         <div className="ml-7 border-l border-[var(--chrome-border)] pl-3">
                           {repoChats.length === 0 ? (
-                            <span className="flex items-center gap-1.5 py-1.5 text-[11px] text-[var(--chrome-text-muted)]">
-                              <GitBranch className="h-3 w-3" />
-                              <code className="font-mono-code">{repo.default_branch || 'main'}</code>
+                            <span className="block px-1 py-1.5 text-[11px] italic text-[var(--chrome-text-muted)]">
+                              No chats yet
                             </span>
                           ) : (
                             <div className="space-y-0.5 py-1">
