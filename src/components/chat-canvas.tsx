@@ -18,6 +18,7 @@ import {
   Copy,
   Check,
   Cpu,
+  ThumbsDown,
 } from 'lucide-react'
 import { TelemetryStreamer } from '@/components/telemetry-streamer'
 import { DiffReviewModal } from '@/components/diff-review-modal'
@@ -101,8 +102,16 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
     scrollToBottom(false)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // History hydration should land the user on the LATEST message instantly,
+  // like ChatGPT — smooth-scrolling a long restored thread feels like drift.
+  const jumpPendingRef = useRef(false)
   useEffect(() => {
-    scrollToBottom()
+    if (jumpPendingRef.current) {
+      jumpPendingRef.current = false
+      scrollToBottom(false)
+    } else {
+      scrollToBottom()
+    }
   }, [messages.length, isSubmitting, scrollToBottom])
 
   // Conversation pages restore their persisted thread; the home canvas never
@@ -141,6 +150,13 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
         }
 
         // Merge instead of replace — never clobber messages sent mid-hydration.
+        if (restored.length > 0) {
+          jumpPendingRef.current = true
+          // TaskCards expand as their data streams in — re-anchor after settle.
+          window.setTimeout(() => {
+            if (!cancelled) scrollToBottom(false)
+          }, 400)
+        }
         setMessages((prev) => {
           const seen = new Set(prev.map((m) => m.id))
           return [...restored.filter((m) => !seen.has(m.id)), ...prev]
@@ -155,7 +171,7 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
     return () => {
       cancelled = true
     }
-  }, [user, conversationId])
+  }, [user, conversationId, scrollToBottom])
 
   // Opening an older thread should aim the composer at that thread's repository.
   const conversationRepoId = conversation?.repoId ?? null
@@ -642,10 +658,10 @@ function TaskCard({ task }: { task: QueuedTask }) {
           <div className="flex min-w-0 items-center gap-3">
             <span className="relative shrink-0">
               {taskActive && (
-                <span className="absolute inset-0 animate-ping rounded-2xl bg-[var(--brand)] opacity-20" aria-hidden />
+                <span className="absolute inset-0 animate-ping rounded-full bg-[var(--brand)] opacity-20" aria-hidden />
               )}
-              <span className="relative flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] shadow-[0_6px_16px_-6px_var(--brand-glow)]">
-                <Image src="/logo.png" alt="" width={17} height={17} className="object-contain brightness-0 invert" />
+              <span className="relative flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white shadow-[var(--shadow-sm)]">
+                <Image src="/logo.png" alt="" width={18} height={18} className="object-contain" />
               </span>
             </span>
             <div className="min-w-0">
@@ -712,7 +728,7 @@ function TaskCard({ task }: { task: QueuedTask }) {
           </p>
         )}
 
-        {/* Review CTA / failure note */}
+        {/* Review CTA / decision / failure note */}
         <AnimatePresence>
           {(reviewable || failed) && (
             <motion.div
@@ -724,13 +740,36 @@ function TaskCard({ task }: { task: QueuedTask }) {
             >
               <div className="border-t border-black/[0.05] p-3">
                 {reviewable ? (
-                  <button
-                    onClick={() => setReviewOpen(true)}
-                    className="btn-brand pressable flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-xs font-bold"
-                  >
-                    <FileCode2 className="h-3.5 w-3.5" />
-                    Review changes
-                  </button>
+                  ['completed', 'success', 'rejected'].includes(statusLower) ? (
+                    <div className="flex gap-2.5">
+                      <button
+                        onClick={() => setReviewOpen(true)}
+                        className="pressable flex flex-1 items-center justify-center gap-2 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] py-2.5 text-xs font-bold text-[var(--foreground)] hover:border-[var(--brand)]"
+                      >
+                        <FileCode2 className="h-3.5 w-3.5" />
+                        Review changes
+                      </button>
+                      {statusLower === 'rejected' ? (
+                        <span className="flex flex-[1.2] items-center justify-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] py-2.5 text-xs font-bold text-[var(--foreground-secondary)]">
+                          <ThumbsDown className="h-3.5 w-3.5" />
+                          Rejected
+                        </span>
+                      ) : (
+                        <span className="flex flex-[1.2] items-center justify-center gap-1.5 rounded-full border border-[var(--success)]/25 bg-[var(--success-soft)] py-2.5 text-xs font-bold text-[var(--success)]">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          Pushed to GitHub
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setReviewOpen(true)}
+                      className="btn-brand pressable flex w-full items-center justify-center gap-2 rounded-full py-2.5 text-xs font-bold"
+                    >
+                      <FileCode2 className="h-3.5 w-3.5" />
+                      Review changes
+                    </button>
+                  )
                 ) : (
                   <p className="flex items-center justify-center gap-1.5 py-1 text-center text-[11px] font-medium text-[var(--error)]">
                     <CircleAlert className="h-3.5 w-3.5" />
@@ -755,6 +794,13 @@ function TaskCard({ task }: { task: QueuedTask }) {
         taskId={task.taskId}
         branchName={task.branchName}
         diffContent={diffContent ?? ''}
+        decision={
+          statusLower === 'rejected'
+            ? 'rejected'
+            : ['completed', 'success'].includes(statusLower)
+              ? 'pushed'
+              : null
+        }
       />
     </>
   )

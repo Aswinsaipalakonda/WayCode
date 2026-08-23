@@ -11,9 +11,11 @@ interface DiffReviewModalProps {
   taskId: string
   branchName: string
   diffContent: string
+  /** Set once the user has decided — the modal becomes read-only history. */
+  decision?: 'pushed' | 'rejected' | null
 }
 
-export function DiffReviewModal({ isOpen, onClose, taskId, branchName, diffContent }: DiffReviewModalProps) {
+export function DiffReviewModal({ isOpen, onClose, taskId, branchName, diffContent, decision = null }: DiffReviewModalProps) {
   const [isApproving, setIsApproving] = useState(false)
   const [isRejecting, setIsRejecting] = useState(false)
   const [result, setResult] = useState<'approved' | 'rejected' | null>(null)
@@ -158,45 +160,49 @@ export function DiffReviewModal({ isOpen, onClose, taskId, branchName, diffConte
 
             {/* Result banner */}
             <AnimatePresence>
-              {result && (
+              {(result || decision) && (
                 <motion.div
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
                   className={`overflow-hidden border-t text-center text-xs font-semibold ${
-                    result === 'approved'
-                      ? 'border-[var(--success)]/25 bg-[var(--success-soft)] text-[var(--success)]'
-                      : 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground-secondary)]'
+                    result === 'rejected' || decision === 'rejected'
+                      ? 'border-[var(--border)] bg-[var(--surface)] text-[var(--foreground-secondary)]'
+                      : 'border-[var(--success)]/25 bg-[var(--success-soft)] text-[var(--success)]'
                   }`}
                 >
                   <p className="flex items-center justify-center gap-2 py-3">
                     <CheckCircle2 className="h-4 w-4" />
-                    {result === 'approved' ? 'Pushed to GitHub · PR created · deployment triggered' : 'Task discarded safely'}
+                    {result === 'rejected' || decision === 'rejected'
+                      ? 'Task discarded safely — nothing was pushed'
+                      : 'Pushed to GitHub · PR created · deployment triggered'}
                   </p>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Footer actions */}
-            <div className="flex gap-2.5 border-t border-[var(--border)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <button
-                onClick={handleReject}
-                disabled={isRejecting || isApproving || !!result}
-                className="pressable flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[var(--error)]/30 bg-[var(--error-soft)] py-3 text-xs font-bold text-[var(--error)] hover:bg-[var(--error)]/20 disabled:opacity-50"
-              >
-                {isRejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ThumbsDown className="h-3.5 w-3.5" />}
-                Reject
-              </button>
+            {/* Footer actions — hidden once a decision has been made */}
+            {!decision && (
+              <div className="flex gap-2.5 border-t border-[var(--border)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                <button
+                  onClick={handleReject}
+                  disabled={isRejecting || isApproving || !!result}
+                  className="pressable flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[var(--error)]/30 bg-[var(--error-soft)] py-3 text-xs font-bold text-[var(--error)] hover:bg-[var(--error)]/20 disabled:opacity-50"
+                >
+                  {isRejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ThumbsDown className="h-3.5 w-3.5" />}
+                  Reject
+                </button>
 
-              <button
-                onClick={handleApprove}
-                disabled={isApproving || isRejecting || !!result}
-                className="btn-brand pressable flex flex-[1.6] items-center justify-center gap-1.5 rounded-full py-3 text-xs font-bold"
-              >
-                {isApproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitPullRequest className="h-3.5 w-3.5" />}
-                Approve & Push to GitHub
-              </button>
-            </div>
+                <button
+                  onClick={handleApprove}
+                  disabled={isApproving || isRejecting || !!result}
+                  className="btn-brand pressable flex flex-[1.6] items-center justify-center gap-1.5 rounded-full py-3 text-xs font-bold"
+                >
+                  {isApproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitPullRequest className="h-3.5 w-3.5" />}
+                  Approve & Push to GitHub
+                </button>
+              </div>
+            )}
           </motion.div>
         </div>
       )}
