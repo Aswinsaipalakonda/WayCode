@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AnimatePresence, motion } from 'motion/react'
 import { toast } from 'sonner'
@@ -16,6 +17,7 @@ import {
   X,
   Copy,
   Check,
+  Cpu,
 } from 'lucide-react'
 import { TelemetryStreamer } from '@/components/telemetry-streamer'
 import { DiffReviewModal } from '@/components/diff-review-modal'
@@ -32,6 +34,26 @@ interface ThreadMessage {
 interface QueuedTask {
   taskId: string
   branchName: string
+  inputTokens?: number | null
+  outputTokens?: number | null
+  modelUsed?: string | null
+}
+
+export interface ConversationRef {
+  id: string
+  repoId?: string | null
+  repoName: string | null
+}
+
+interface HydratedTaskRow {
+  id: string
+  prompt: string
+  branch_name: string | null
+  status: string
+  created_at: string
+  input_tokens?: number | null
+  output_tokens?: number | null
+  model_used?: string | null
 }
 
 const MAX_LEN = 2000
@@ -41,18 +63,27 @@ function nowTime() {
 }
 
 /**
- * Remounts the whole thread when "New Task" is triggered,
- * giving a clean slate without effect-driven resets.
+ * Home screen — ALWAYS a brand-new chat, like ChatGPT/Gemini on launch.
+ * Remounts on "New Task" for a clean slate without effect-driven resets.
+ * Persisted history lives at its own /c/<id> URL, reachable from the sidebar.
  */
 export function ChatCanvas() {
   const { newTaskNonce } = useAppChrome()
   return <ChatThread key={newTaskNonce} />
 }
 
-function ChatThread() {
-  const { user, selectedRepo, openRepoPicker, onSelectRepo } = useAppChrome()
+/** Thread bound to one conversation — rendered at its unique /c/<id> URL. */
+export function ConversationChat({ conversation }: { conversation: ConversationRef }) {
+  const { newTaskNonce } = useAppChrome()
+  return <ChatThread key={`c-${newTaskNonce}`} conversation={conversation} />
+}
+
+function ChatThread({ conversation }: { conversation?: ConversationRef }) {
+  const { user, selectedRepo, repositories, openRepoPicker, onSelectRepo } = useAppChrome()
+  const router = useRouter()
 
   const [messages, setMessages] = useState<ThreadMessage[]>([])
+  const [hydrating, setHydrating] = useState(Boolean(conversation?.id))
   const [prompt, setPrompt] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -73,6 +104,66 @@ function ChatThread() {
   useEffect(() => {
     scrollToBottom()
   }, [messages.length, isSubmitting, scrollToBottom])
+
+  // Conversation pages restore their persisted thread; the home canvas never
+  // does — opening the app always starts fresh, ChatGPT-style.
+  const conversationId = conversation?.id
+  useEffect(() => {
+    if (!conversationId || !user) return
+    let cancelled = false
+
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/tasks?conversationId=${encodeURIComponent(conversationId)}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (cancelled || !data.success || !Array.isArray(data.tasks)) return
+
+        const restored: ThreadMessage[] = []
+        for (const t of data.tasks as HydratedTaskRow[]) {
+          restored.push({
+            id: `h-${t.id}`,
+            role: 'user',
+            text: t.prompt,
+            time: new Date(t.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }),
+          })
+          restored.push({
+            id: `t-${t.id}`,
+            role: 'assistant',
+            task: {
+              taskId: t.id,
+              branchName: t.branch_name ?? '',
+              inputTokens: t.input_tokens,
+              outputTokens: t.output_tokens,
+              modelUsed: t.model_used,
+            },
+          })
+        }
+
+        // Merge instead of replace — never clobber messages sent mid-hydration.
+        setMessages((prev) => {
+          const seen = new Set(prev.map((m) => m.id))
+          return [...restored.filter((m) => !seen.has(m.id)), ...prev]
+        })
+      } catch {
+        /* offline tolerance — the empty canvas is still usable */
+      } finally {
+        if (!cancelled) setHydrating(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [user, conversationId])
+
+  // Opening an older thread should aim the composer at that thread's repository.
+  const conversationRepoId = conversation?.repoId ?? null
+  useEffect(() => {
+    if (!conversationRepoId || selectedRepo?.id === conversationRepoId) return
+    const repo = repositories.find((r) => r.id === conversationRepoId)
+    if (repo) onSelectRepo(repo)
+  }, [conversationRepoId, repositories, selectedRepo?.id, onSelectRepo])
 
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPrompt(e.target.value.slice(0, MAX_LEN))
@@ -105,6 +196,10 @@ function ChatThread() {
           prompt: text,
           repoId: selectedRepo.id,
           repoName: selectedRepo.repo_name,
+          // Continue the open thread, or spin up a fresh conversation for this prompt.
+          ...(conversation
+            ? { conversationId: conversation.id }
+            : { startConversation: true }),
         }),
       })
       const data = await res.json()
@@ -121,6 +216,11 @@ function ChatThread() {
         toast.success('Task queued', {
           description: `${selectedRepo.repo_name.split('/')[1] || selectedRepo.repo_name} · ${data.branchName}`,
         })
+        // First prompt of a new thread → move to its permanent URL so refresh,
+        // history and the sidebar all point at the same conversation.
+        if (!conversation && data.conversationId) {
+          router.push(`/c/${data.conversationId}`)
+        }
       } else {
         setMessages((prev) => prev.filter((m) => m.id !== userMessageId))
         toast.error(data.error || 'Could not queue this task', {
@@ -171,7 +271,15 @@ function ChatThread() {
     <div className="flex h-full flex-col">
       {/* ---------- Thread ---------- */}
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        {!hasThread ? (
+        {!hasThread && hydrating ? (
+          /* Restoring the persisted thread */
+          <div className="flex min-h-full items-center justify-center">
+            <span className="flex items-center gap-2 text-[12px] font-medium text-[var(--muted-foreground)]">
+              <Loader2 className="h-4 w-4 animate-spin text-[var(--brand)]" />
+              Restoring your tasks…
+            </span>
+          </div>
+        ) : !hasThread ? (
           /* Empty state — calm, Gemini-style centered */
           <div className="flex min-h-full flex-col items-center justify-center px-6 pb-16 text-center">
             <motion.h1
@@ -417,6 +525,11 @@ function TaskCard({ task }: { task: QueuedTask }) {
   const supabase = createClient()
   const [status, setStatus] = useState<string>('queued')
   const [diffContent, setDiffContent] = useState<string | null>(null)
+  const [usage, setUsage] = useState<{
+    input: number | null
+    output: number | null
+    model: string | null
+  }>({ input: task.inputTokens ?? null, output: task.outputTokens ?? null, model: task.modelUsed ?? null })
   const [reviewOpen, setReviewOpen] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
@@ -427,12 +540,17 @@ function TaskCard({ task }: { task: QueuedTask }) {
     async function catchUp() {
       const { data } = await supabase
         .from('task_jobs')
-        .select('status, diff_content')
+        .select('status, diff_content, input_tokens, output_tokens, model_used')
         .eq('id', task.taskId)
         .single()
       if (!cancelled && data) {
         setStatus(data.status ?? 'queued')
         if (data.diff_content) setDiffContent(data.diff_content as string)
+        setUsage({
+          input: (data.input_tokens as number | null) ?? null,
+          output: (data.output_tokens as number | null) ?? null,
+          model: (data.model_used as string | null) ?? null,
+        })
       }
     }
     catchUp()
@@ -443,9 +561,20 @@ function TaskCard({ task }: { task: QueuedTask }) {
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'task_jobs', filter: `id=eq.${task.taskId}` },
         (payload) => {
-          const next = payload.new as { status?: string; diff_content?: string | null }
+          const next = payload.new as {
+            status?: string
+            diff_content?: string | null
+            input_tokens?: number | null
+            output_tokens?: number | null
+            model_used?: string | null
+          }
           if (next.status) setStatus(next.status)
           if (next.diff_content) setDiffContent(next.diff_content)
+          setUsage({
+            input: next.input_tokens ?? null,
+            output: next.output_tokens ?? null,
+            model: next.model_used ?? null,
+          })
         }
       )
       .subscribe()
@@ -554,6 +683,14 @@ function TaskCard({ task }: { task: QueuedTask }) {
         <div className="mx-4 mb-2">
           <TelemetryStreamer taskId={task.taskId} active={!['completed', 'success', 'failed', 'rejected'].includes(statusLower)} />
         </div>
+
+        {usage.input != null && usage.output != null && usage.input + usage.output > 0 && (
+          <p className="flex items-center justify-center gap-1.5 pb-2.5 text-[10px] font-medium text-[var(--muted-foreground)]">
+            <Cpu className="h-3 w-3 shrink-0" />
+            {(usage.input + usage.output).toLocaleString()} tokens used
+            {usage.model ? <span className="font-mono-code">· {usage.model}</span> : null}
+          </p>
+        )}
 
         {/* Review CTA / failure note */}
         <AnimatePresence>

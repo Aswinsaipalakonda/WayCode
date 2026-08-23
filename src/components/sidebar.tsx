@@ -1,22 +1,57 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
 import { toast } from 'sonner'
-import { Plus, History, RefreshCw, ChevronRight, GitBranch, Settings2, Circle } from 'lucide-react'
+import { Plus, History, RefreshCw, ChevronRight, GitBranch, MessageSquare, Settings2, Circle } from 'lucide-react'
 import { useAppChrome } from '@/components/app-chrome'
 
 interface SidebarProps {
   onNavigate?: () => void
 }
 
+interface ConversationItem {
+  id: string
+  repo_id: string | null
+  repo_name: string | null
+  title: string
+  updated_at: string
+}
+
 export function Sidebar({ onNavigate }: SidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const { repositories, selectedRepo, onSelectRepo, syncRepos, isSyncing, openSettings, triggerNewTask } =
     useAppChrome()
-  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [conversations, setConversations] = useState<ConversationItem[]>([])
+  // undefined = no manual toggle yet → auto-expand the repo of the open thread.
+  const [expandedId, setExpandedId] = useState<string | null | undefined>(undefined)
+
+  const activeConversationId = pathname.startsWith('/c/') ? pathname.slice(3) : null
+  const activeConversation = conversations.find((c) => c.id === activeConversationId) ?? null
+
+  // Recent threads — refetch on every route change so a freshly-created
+  // conversation appears under its repository immediately.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/conversations')
+        if (!res.ok) return
+        const data = await res.json()
+        if (!cancelled && data.success && Array.isArray(data.conversations)) {
+          setConversations(data.conversations as ConversationItem[])
+        }
+      } catch {
+        /* offline tolerance */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [pathname])
 
   const handleSync = async () => {
     try {
@@ -28,6 +63,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
       toast.error('Sync failed', { description: 'Could not refresh your repositories right now.' })
     }
   }
+
 
   return (
     <aside className="flex h-full w-full flex-col bg-[var(--chrome-bg)] text-[13px] select-none">
@@ -58,7 +94,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         </Link>
       </div>
 
-      {/* Repositories */}
+      {/* Repositories with nested chat threads */}
       <div className="min-h-0 flex-1 overflow-hidden px-3 pb-3">
         <div className="mb-1 flex items-center justify-between px-1.5 pt-1 pb-1">
           <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--chrome-text-muted)]">
@@ -82,7 +118,9 @@ export function Sidebar({ onNavigate }: SidebarProps) {
             repositories.map((repo, i) => {
               const shortName = repo.repo_name.split('/')[1] || repo.repo_name
               const isSelected = selectedRepo?.id === repo.id
-              const isExpanded = expandedId === repo.id
+              const repoChats = conversations.filter((c) => c.repo_id === repo.id)
+              const isExpanded =
+                expandedId === undefined ? isSelected || activeConversation?.repo_id === repo.id : expandedId === repo.id
 
               return (
                 <motion.div
@@ -91,12 +129,22 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.04, duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
                 >
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => {
                       onSelectRepo(repo)
-                      onNavigate?.()
+                      setExpandedId(isExpanded ? null : repo.id)
+                      // Opening a different repo's canvas while inside another
+                      // repo's thread starts a NEW chat with that repo.
+                      if (pathname.startsWith('/c/') && activeConversation?.repo_id !== repo.id) {
+                        router.push('/')
+                      }
                     }}
-                    className={`pressable group flex w-full items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left ${
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') e.currentTarget.click()
+                    }}
+                    className={`pressable group flex w-full cursor-pointer items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left ${
                       isSelected
                         ? 'bg-[rgba(10,102,255,0.18)] font-semibold text-[#6aa5ff]'
                         : 'text-[var(--chrome-text-secondary)] hover:bg-white/6 hover:text-[var(--chrome-text)]'
@@ -109,16 +157,17 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                       fill={isSelected ? 'currentColor' : 'none'}
                     />
                     <span className="truncate flex-1">{shortName}</span>
+                    {repoChats.length > 0 && (
+                      <span className="shrink-0 rounded-full bg-white/6 px-1.5 py-px text-[9px] font-bold text-[var(--chrome-text-muted)]">
+                        {repoChats.length}
+                      </span>
+                    )}
                     <ChevronRight
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setExpandedId(isExpanded ? null : repo.id)
-                      }}
                       className={`h-3.5 w-3.5 shrink-0 opacity-50 transition-transform duration-300 ${
                         isExpanded ? 'rotate-90' : ''
                       }`}
                     />
-                  </button>
+                  </div>
 
                   <AnimatePresence initial={false}>
                     {isExpanded && (
@@ -129,11 +178,39 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                         transition={{ duration: 0.26, ease: [0.16, 1, 0.3, 1] }}
                         className="overflow-hidden"
                       >
-                        <div className="ml-7 border-l border-[var(--chrome-border)] py-1 pl-3">
-                          <span className="flex items-center gap-1.5 py-1 text-[11px] text-[var(--chrome-text-muted)]">
-                            <GitBranch className="h-3 w-3" />
-                            <code className="font-mono-code">{repo.default_branch || 'main'}</code>
-                          </span>
+                        <div className="ml-7 border-l border-[var(--chrome-border)] pl-3">
+                          {repoChats.length === 0 ? (
+                            <span className="flex items-center gap-1.5 py-1.5 text-[11px] text-[var(--chrome-text-muted)]">
+                              <GitBranch className="h-3 w-3" />
+                              <code className="font-mono-code">{repo.default_branch || 'main'}</code>
+                            </span>
+                          ) : (
+                            <div className="space-y-0.5 py-1">
+                              {repoChats.map((chat) => {
+                                const isActive = pathname === `/c/${chat.id}`
+                                return (
+                                  <Link
+                                    key={chat.id}
+                                    href={`/c/${chat.id}`}
+                                    onClick={onNavigate}
+                                    title={chat.title}
+                                    className={`pressable flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-left ${
+                                      isActive
+                                        ? 'bg-white/10 text-[var(--chrome-text)]'
+                                        : 'text-[var(--chrome-text-secondary)] hover:bg-white/6 hover:text-[var(--chrome-text)]'
+                                    }`}
+                                  >
+                                    <MessageSquare
+                                      className={`h-3 w-3 shrink-0 ${isActive ? 'text-[#6aa5ff]' : 'text-[var(--chrome-text-muted)]'}`}
+                                    />
+                                    <span className="min-w-0 flex-1 truncate text-[12px] leading-snug">
+                                      {chat.title}
+                                    </span>
+                                  </Link>
+                                )
+                              })}
+                            </div>
+                          )}
                         </div>
                       </motion.div>
                     )}
@@ -141,6 +218,38 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                 </motion.div>
               )
             })
+          )}
+
+          {/* Threads without a repository (legacy) */}
+          {conversations.some((c) => !c.repo_id) && (
+            <div className="mt-2 border-t border-[var(--chrome-border)] pt-2">
+              <span className="mb-1 block px-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--chrome-text-muted)]">
+                Chats
+              </span>
+              {conversations
+                .filter((c) => !c.repo_id)
+                .map((conv) => {
+                  const isActive = pathname === `/c/${conv.id}`
+                  return (
+                    <Link
+                      key={conv.id}
+                      href={`/c/${conv.id}`}
+                      onClick={onNavigate}
+                      title={conv.title}
+                      className={`pressable flex items-center gap-2.5 rounded-2xl px-3 py-2 text-left ${
+                        isActive
+                          ? 'bg-[rgba(10,102,255,0.18)] font-semibold text-[#6aa5ff]'
+                          : 'text-[var(--chrome-text-secondary)] hover:bg-white/6 hover:text-[var(--chrome-text)]'
+                      }`}
+                    >
+                      <MessageSquare
+                        className={`h-3.5 w-3.5 shrink-0 ${isActive ? 'text-[#6aa5ff]' : 'text-[var(--chrome-text-muted)]'}`}
+                      />
+                      <span className="min-w-0 flex-1 truncate">{conv.title}</span>
+                    </Link>
+                  )
+                })}
+            </div>
           )}
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { decryptSecret } from '@/lib/crypto'
 import { NextResponse } from 'next/server'
 
 export async function POST() {
@@ -10,8 +11,29 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const providerToken = session?.provider_token
   const githubUsername = user.user_metadata?.user_name || user.user_metadata?.preferred_username
+
+  // provider_token is emitted by supabase-js only once, right after OAuth sign-in,
+  // and is never persisted — so it's undefined on every later sync. Fall back to
+  // the encrypted GitHub token stored server-side during the auth callback.
+  let providerToken = session?.provider_token ?? null
+  if (!providerToken) {
+    const { data: settings } = await supabase
+      .from('user_settings')
+      .select('github_token')
+      .eq('user_id', user.id)
+      .maybeSingle()
+    if (settings?.github_token) {
+      try {
+        providerToken = decryptSecret(settings.github_token)
+      } catch {
+        return NextResponse.json(
+          { error: 'Stored GitHub token could not be decrypted — sign out and back in.' },
+          { status: 409 },
+        )
+      }
+    }
+  }
 
   try {
     let repos: Array<{ full_name: string; default_branch?: string }> = []
@@ -26,6 +48,8 @@ export async function POST() {
 
       if (ghRes.ok) {
         repos = await ghRes.json()
+      } else {
+        console.error(`GitHub repo sync failed with HTTP ${ghRes.status}`)
       }
     }
 
@@ -59,11 +83,17 @@ export async function POST() {
         connection_state: 'connected',
       }))
 
-      await supabase
+      // Return the persisted rows — the client keys/selection rely on `id`.
+      const { data: savedRepos, error: upsertError } = await supabase
         .from('repositories')
         .upsert(repoRows, { onConflict: 'user_id,repo_name' })
+        .select('id, user_id, repo_name, default_branch, connection_state')
 
-      return NextResponse.json({ success: true, count: repoRows.length, repos: repoRows })
+      if (upsertError) {
+        return NextResponse.json({ error: upsertError.message }, { status: 500 })
+      }
+
+      return NextResponse.json({ success: true, count: savedRepos?.length ?? 0, repos: savedRepos ?? [] })
     }
 
     return NextResponse.json({ success: true, count: 0, repos: [] })

@@ -11,7 +11,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { prompt, repoId, repoName } = await request.json()
+    const { prompt, repoId, repoName, conversationId, startConversation } = await request.json()
 
     if (!prompt || !prompt.trim()) {
       return NextResponse.json({ error: 'Prompt intent is required' }, { status: 400 })
@@ -29,7 +29,40 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2. Insert new task job record into Supabase (Status: queued)
+    // 2. Resolve the conversation this task belongs to.
+    let resolvedConversationId: string | null = null
+
+    if (conversationId) {
+      const { data: conv } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('id', conversationId)
+        .single()
+      if (!conv) {
+        return NextResponse.json({ error: 'Conversation not found' }, { status: 403 })
+      }
+      resolvedConversationId = conv.id
+    } else if (startConversation && (repoId || repoName)) {
+      // First prompt of a fresh thread → spin up the conversation instantly so it
+      // gets its own URL under the related repository.
+      const title = String(prompt).trim().slice(0, 72)
+      const { data: conv, error: convError } = await supabase
+        .from('conversations')
+        .insert({
+          user_id: user.id,
+          repo_id: repoId || null,
+          repo_name: repoName || null,
+          title,
+        })
+        .select('id')
+        .single()
+      if (convError || !conv) {
+        return NextResponse.json({ error: convError?.message || 'Failed to create conversation' }, { status: 500 })
+      }
+      resolvedConversationId = conv.id
+    }
+
+    // 3. Insert new task job record into Supabase (Status: queued)
     const { data: job, error: jobError } = await supabase
       .from('task_jobs')
       .insert({
@@ -38,12 +71,21 @@ export async function POST(request: Request) {
         prompt,
         status: 'queued',
         branch_name: `waycode/task-${Math.random().toString(36).substring(2, 8)}`,
+        ...(resolvedConversationId ? { conversation_id: resolvedConversationId } : {}),
       })
       .select()
       .single()
 
     if (jobError || !job) {
       return NextResponse.json({ error: jobError?.message || 'Failed to create job' }, { status: 500 })
+    }
+
+    if (resolvedConversationId) {
+      // Bump the thread to the top of the sidebar.
+      await supabase
+        .from('conversations')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', resolvedConversationId)
     }
 
     // 3. Write initial queued log line to task_logs
@@ -79,6 +121,7 @@ export async function POST(request: Request) {
         taskId: job.id,
         status: 'queued',
         branchName: job.branch_name,
+        conversationId: resolvedConversationId,
         message: 'Task successfully enqueued into VPS background daemon pipeline',
       },
       { status: 202 }

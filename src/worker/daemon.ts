@@ -25,9 +25,18 @@ async function writeLog(taskId: string, logLevel: string, message: string) {
   await supabase.from('task_logs').insert({ task_id: taskId, log_level: logLevel, message })
 }
 
-async function updateJobStatus(taskId: string, status: string, diffContent?: string) {
-  const updateData: Record<string, unknown> = { status: status, updated_at: new Date().toISOString() }
-  if (diffContent) updateData.diff_content = diffContent
+async function updateJobStatus(
+  taskId: string,
+  status: string,
+  extra?: { diffContent?: string; usage?: { input: number; output: number }; model?: string },
+) {
+  const updateData: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
+  if (extra?.diffContent) updateData.diff_content = extra.diffContent
+  if (extra?.model) updateData.model_used = extra.model
+  if (extra?.usage) {
+    updateData.input_tokens = Math.round(extra.usage.input)
+    updateData.output_tokens = Math.round(extra.usage.output)
+  }
   await supabase.from('task_jobs').update(updateData).eq('id', taskId)
 }
 
@@ -102,12 +111,32 @@ function makeModelCaller(apiKey: string, providerRaw: string, model: string, cus
     }
 
     if (provider === 'anthropic') {
-      const data = (await res.json()) as { content?: Array<{ type?: string; text?: string }> }
-      return data.content?.find((c) => c.type === 'text')?.text ?? ''
+      const data = (await res.json()) as {
+        content?: Array<{ type?: string; text?: string }>
+        usage?: { input_tokens?: number; output_tokens?: number }
+      }
+      const text = data.content?.find((c) => c.type === 'text')?.text ?? ''
+      return {
+        text,
+        usage: {
+          input: data.usage?.input_tokens ?? 0,
+          output: data.usage?.output_tokens ?? 0,
+        },
+      }
     }
 
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> }
-    return data.choices?.[0]?.message?.content ?? ''
+    const data = (await res.json()) as {
+      choices?: Array<{ message?: { content?: string } }>
+      usage?: { prompt_tokens?: number; completion_tokens?: number }
+    }
+    const text = data.choices?.[0]?.message?.content ?? ''
+    return {
+      text,
+      usage: {
+        input: data.usage?.prompt_tokens ?? 0,
+        output: data.usage?.completion_tokens ?? 0,
+      },
+    }
   }
 }
 
@@ -162,6 +191,8 @@ async function processJob(jobPayload: string) {
       .limit(1)
       .maybeSingle()
 
+    // runTask accumulates usage across all model turns and reports the totals
+    // alongside the final status — persist them straight onto the job row.
     await runTask(
       {
         taskId: job.taskId,
@@ -173,7 +204,8 @@ async function processJob(jobPayload: string) {
       {
         model: makeModelCaller(apiKey, provider, model, settings?.custom_base_url ?? null),
         log: (level, message) => writeLog(job.taskId, level, message),
-        setStatus: (status, diffContent) => updateJobStatus(job.taskId, status, diffContent),
+        setStatus: (status, diffContent, usage) =>
+          updateJobStatus(job.taskId, status, { diffContent, model, usage }),
         sandboxRoot: path.join(process.cwd(), '.sandbox'),
         defaultBranch: repoRow?.default_branch || 'main',
         token: githubToken,

@@ -87,7 +87,7 @@ const stubModel: ModelCaller = async (messages: ChatMessage[]) => {
   if (script.length === 0) throw new Error('model script exhausted')
   const next = script.shift()!
   void last
-  return next
+  return { text: next, usage: { input: 120, output: 40 } }
 }
 
 // ---------- Log/status capture ----------
@@ -115,13 +115,15 @@ const BRANCH = 'waycode/task-e2e01'
 async function main() {
 console.log('\n▶ Phase 1 — clone → ACI loop → self-heal → diff')
 let capturedDiff = ''
+let capturedUsage = { input: 0, output: 0 }
 await runTask(
   { taskId: TASK_ID, userId: 'user-1', repoName: 'local/fixture', branchName: BRANCH, prompt: 'Replace index with a greeting using add()' },
   {
     ...deps,
-    setStatus: async (status, diffContent) => {
+    setStatus: async (status, diffContent, usage) => {
       statuses.push(status)
       if (diffContent) capturedDiff = diffContent
+      if (usage) capturedUsage = usage
     },
   },
 )
@@ -131,6 +133,9 @@ assert.ok(statuses.includes('verifying'), 'status: verifying (not failed)')
 assert.ok(!statuses.includes('failed'), `no failure — got ${statuses.join(',')}`)
 assert.ok(capturedDiff.includes('greeting'), 'diff contains the fixed change')
 assert.ok(!capturedDiff.includes('"2"'), 'diff does not contain the buggy line')
+// 4 model calls (list / read / edit+done / self-heal) × (120 in / 40 out)
+assert.strictEqual(capturedUsage.input, 480, 'input tokens accumulated across all turns')
+assert.strictEqual(capturedUsage.output, 160, 'output tokens accumulated across all turns')
 assert.ok(
   logs.some((l) => l.level === 'error' && l.message.includes('Build issues found')),
   'self-heal detected the real tsc failure',

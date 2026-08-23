@@ -13,7 +13,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { provider, apiKey, model, customBaseUrl, testStatus } = await request.json()
+    const { provider, apiKey, model, customBaseUrl, testStatus, removeKey } = await request.json()
+
+    // Removing the stored key resets the vault to unconfigured.
+    if (removeKey === true) {
+      const { error: removeError } = await supabase
+        .from('user_settings')
+        .update({
+          api_key: null,
+          last_test_status: null,
+          last_test_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', user.id)
+
+      if (removeError) {
+        return NextResponse.json({ error: removeError.message }, { status: 500 })
+      }
+      return NextResponse.json({ success: true, keyRemoved: true })
+    }
 
     if (!provider || !VALID_PROVIDERS.has(provider)) {
       return NextResponse.json({ error: 'Invalid provider' }, { status: 400 })

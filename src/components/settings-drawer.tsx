@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { toast } from 'sonner'
 import { SiOpenrouter, SiGooglegemini } from 'react-icons/si'
@@ -22,6 +22,7 @@ import {
   TbLoaderQuarter,
   TbClipboardText,
   TbKey,
+  TbTrash,
 } from 'react-icons/tb'
 
 interface SettingsDrawerProps {
@@ -80,6 +81,17 @@ interface ModelEntry {
   free: boolean
 }
 
+/** Server-side vault snapshot — the key itself never leaves the backend. */
+interface SavedVault {
+  provider: Provider
+  model: string
+  customBaseUrl: string | null
+  hasKey: boolean
+  keyHint: string | null
+  keyReadable: boolean
+  lastTestStatus: string | null
+}
+
 export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
   const [provider, setProvider] = useState<Provider>('openrouter')
   const [credentials, setCredentials] = useState<Record<Provider, { apiKey: string; baseUrl: string }>>({
@@ -101,9 +113,103 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
   const [loadingModels, setLoadingModels] = useState(false)
   const [modelsError, setModelsError] = useState<string | null>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [savedVault, setSavedVault] = useState<SavedVault | null>(null)
+  const [replacingKey, setReplacingKey] = useState(false)
+  const [isRemoving, setIsRemoving] = useState(false)
 
   const meta = PROVIDERS.find((p) => p.id === provider)!
   const { apiKey, baseUrl } = credentials[provider]
+
+  const fetchVault = useCallback(async (): Promise<SavedVault | null> => {
+    try {
+      const res = await fetch('/api/settings/load')
+      if (!res.ok) return null
+      const data = await res.json()
+      if (!data.success) return null
+      return {
+        provider: (['openrouter', 'gemini', 'custom'].includes(data.provider) ? data.provider : 'openrouter') as Provider,
+        model: typeof data.model === 'string' ? data.model : '',
+        customBaseUrl: data.customBaseUrl ?? null,
+        hasKey: Boolean(data.hasKey),
+        keyHint: data.keyHint ?? null,
+        keyReadable: Boolean(data.keyReadable),
+        lastTestStatus: data.lastTestStatus ?? null,
+      }
+    } catch {
+      return null
+    }
+  }, [])
+
+  const loadVaultModels = useCallback(async (targetProvider?: Provider, preferredModel?: string) => {
+    setLoadingModels(true)
+    setModelsError(null)
+    try {
+      const res = await fetch('/api/settings/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ useVault: true, provider: targetProvider ?? provider }),
+      })
+      const data = await res.json()
+
+      if (res.ok && data.success) {
+        const list: ModelEntry[] = data.models ?? []
+        setCatalog(list)
+        setCatalogMeta({ total: data.total ?? list.length, free: data.free ?? 0 })
+        setModelsError(null)
+        const targetModel = preferredModel || model
+        if (targetModel && list.some((m) => m.id === targetModel)) {
+          setModel(targetModel)
+        } else if (list.length > 0 && !targetModel) {
+          setModel(list[0]?.id ?? '')
+        }
+      } else {
+        setModelsError(data.error || 'Could not load the model catalog from vault.')
+      }
+    } catch {
+      setModelsError('Network error while fetching models from vault.')
+    } finally {
+      setLoadingModels(false)
+    }
+  }, [provider, model])
+
+  // Every open restores the persisted vault — provider, model, and proof of
+  // the stored key (masked). The key stays encrypted server-side forever.
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    ;(async () => {
+      const vault = await fetchVault()
+      if (cancelled) return
+      setSavedVault(vault)
+      setReplacingKey(false)
+      setLatency(null)
+      setDetectedProvider(null)
+      setCatalog([])
+      setCatalogMeta({ total: 0, free: 0 })
+      setModelsError(null)
+      if (vault) {
+        const label = PROVIDERS.find((p) => p.id === vault.provider)?.label ?? vault.provider
+        setProvider(vault.provider)
+        if (vault.model) setModel(vault.model)
+        setShowKey(false)
+        setSearch('')
+        if (vault.hasKey && vault.lastTestStatus === 'connected') {
+          setStage('connected')
+          setStatusMsg(`${label} vault restored`)
+          await loadVaultModels(vault.provider, vault.model)
+        } else {
+          setStage('idle')
+          setStatusMsg('')
+        }
+      } else {
+        setStage('idle')
+        setStatusMsg('')
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [isOpen, fetchVault, loadVaultModels])
 
   const updateCredentials = (patch: Partial<{ apiKey: string; baseUrl: string }>) => {
     setCredentials((prev) => ({ ...prev, [provider]: { ...prev[provider], ...patch } }))
@@ -117,16 +223,24 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
     setModelsError(null)
   }
 
-  const switchProvider = (id: Provider) => {
+  const switchProvider = async (id: Provider) => {
     setProvider(id)
     setShowKey(false)
     setSearch('')
-    setStage('idle')
-    setStatusMsg('')
     setLatency(null)
     setDetectedProvider(null)
     setCatalog([])
     setCatalogMeta({ total: 0, free: 0 })
+    setModelsError(null)
+    // Returning to the provider with a validated stored key restores it.
+    if (savedVault?.provider === id && savedVault.hasKey && savedVault.lastTestStatus === 'connected') {
+      setStage('connected')
+      setStatusMsg(`${PROVIDERS.find((p) => p.id === id)?.label ?? id} vault restored`)
+      await loadVaultModels(id, savedVault.model)
+    } else {
+      setStage('idle')
+      setStatusMsg('')
+    }
   }
 
   const freeModels = useMemo(
@@ -252,6 +366,15 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
         toast.success('Vault updated', {
           description: `${meta.label} · ${model}${data.keyReplaced ? '' : ' · key kept from vault'}`,
         })
+        setReplacingKey(false)
+        // Re-read the vault so the masked hint / status stay in sync.
+        const fresh = await fetchVault()
+        if (fresh) {
+          setSavedVault(fresh)
+          if (fresh.hasKey && fresh.lastTestStatus === 'connected') {
+            setStatusMsg(`${PROVIDERS.find((p) => p.id === fresh.provider)?.label ?? fresh.provider} vault restored`)
+          }
+        }
         onClose()
       } else {
         toast.error('Could not save vault', { description: data.error || 'Try again in a moment.' })
@@ -260,6 +383,41 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
       toast.error('Network error', { description: 'Could not reach the save endpoint.' })
     } finally {
       setIsSaving(false)
+    }
+  }
+
+  const handleRemoveKey = async () => {
+    setIsRemoving(true)
+    try {
+      const res = await fetch('/api/settings/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ removeKey: true }),
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        toast.success('API key removed', {
+          description: 'Paste a new key and validate to reconnect the vault.',
+        })
+        setCredentials((prev) => ({
+          openrouter: { apiKey: '', baseUrl: prev.openrouter.baseUrl },
+          gemini: { apiKey: '', baseUrl: prev.gemini.baseUrl },
+          custom: { apiKey: '', baseUrl: prev.custom.baseUrl },
+        }))
+        setStage('idle')
+        setStatusMsg('')
+        setCatalog([])
+        setCatalogMeta({ total: 0, free: 0 })
+        setReplacingKey(false)
+        const fresh = await fetchVault()
+        setSavedVault(fresh)
+      } else {
+        toast.error('Could not remove key', { description: data.error || 'Try again in a moment.' })
+      }
+    } catch {
+      toast.error('Network error', { description: 'Could not reach the save endpoint.' })
+    } finally {
+      setIsRemoving(false)
     }
   }
 
@@ -450,35 +608,93 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                 >
                   API Key
                 </SectionLabel>
-                <div className="relative">
-                  <input
-                    type={showKey ? 'text' : 'password'}
-                    placeholder={KEY_PLACEHOLDER[provider]}
-                    value={apiKey}
-                    onChange={(e) => updateCredentials({ apiKey: e.target.value })}
-                    className={`${inputCls} pr-20 font-mono-code text-xs`}
-                    spellCheck={false}
-                  />
-                  <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
-                    <button
-                      type="button"
-                      onClick={handlePasteKey}
-                      aria-label="Paste key from clipboard"
-                      title="Paste from clipboard"
-                      className="pressable rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]"
-                    >
-                      <TbClipboardText className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowKey((v) => !v)}
-                      aria-label={showKey ? 'Hide key' : 'Show key'}
-                      className="pressable rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--foreground)]"
-                    >
-                      {showKey ? <TbEyeOff className="h-4 w-4" /> : <TbEye className="h-4 w-4" />}
-                    </button>
+                {savedVault?.hasKey && !replacingKey ? (
+                  savedVault.keyReadable ? (
+                    <div className="flex items-center gap-2 rounded-xl border border-[var(--success)]/25 bg-[var(--success-soft)] px-3.5 py-2.5">
+                      <TbShieldLock className="h-4 w-4 shrink-0 text-[var(--success)]" />
+                      <code
+                        className="min-w-0 flex-1 truncate font-mono-code text-xs text-[var(--foreground-secondary)]"
+                        title="Stored key (encrypted at rest)"
+                      >
+                        {savedVault.keyHint}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplacingKey(true)
+                          updateCredentials({ apiKey: '' })
+                        }}
+                        className="pressable shrink-0 rounded-lg px-2 py-1 text-[10.5px] font-bold text-[var(--brand)] hover:bg-[var(--brand-soft)]"
+                      >
+                        Replace
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRemoveKey}
+                        disabled={isRemoving}
+                        aria-label="Remove stored API key"
+                        title="Remove key from vault"
+                        className="pressable shrink-0 rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--error-soft)] hover:text-[var(--error)] disabled:opacity-50"
+                      >
+                        {isRemoving ? (
+                          <TbLoaderQuarter className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <TbTrash className="h-4 w-4" />
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 rounded-xl border border-[var(--warning, #b45309)]/30 px-3.5 py-2.5" style={{ background: 'rgba(180, 83, 9, 0.08)' }}>
+                      <TbAlertTriangleFilled className="h-4 w-4 shrink-0" style={{ color: '#b45309' }} />
+                      <p className="min-w-0 flex-1 text-[11px] font-medium text-[var(--foreground-secondary)]">
+                        Stored key exists but can&apos;t be decrypted with the current server key.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleRemoveKey}
+                        disabled={isRemoving}
+                        className="pressable shrink-0 rounded-lg px-2 py-1 text-[10.5px] font-bold text-[var(--brand)] hover:bg-[var(--brand-soft)] disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )
+                ) : (
+                  <div className="relative">
+                    <input
+                      type={showKey ? 'text' : 'password'}
+                      placeholder={KEY_PLACEHOLDER[provider]}
+                      value={apiKey}
+                      onChange={(e) => updateCredentials({ apiKey: e.target.value })}
+                      className={`${inputCls} pr-20 font-mono-code text-xs`}
+                      spellCheck={false}
+                    />
+                    <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={handlePasteKey}
+                        aria-label="Paste key from clipboard"
+                        title="Paste from clipboard"
+                        className="pressable rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]"
+                      >
+                        <TbClipboardText className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowKey((v) => !v)}
+                        aria-label={showKey ? 'Hide key' : 'Show key'}
+                        className="pressable rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--foreground)]"
+                      >
+                        {showKey ? <TbEyeOff className="h-4 w-4" /> : <TbEye className="h-4 w-4" />}
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
+                {savedVault?.hasKey && replacingKey && (
+                  <p className="px-1 text-[10px] font-medium text-[var(--muted-foreground)]">
+                    Saving a new key replaces the one in the vault — the old ciphertext is discarded.
+                  </p>
+                )}
               </section>
 
               {/* Model routing — fully dynamic */}

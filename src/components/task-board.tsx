@@ -20,6 +20,7 @@ interface TaskJob {
   branch_name: string | null
   created_at: string
   repo_id?: string | null
+  conversation_id?: string | null
 }
 
 type StatusFilter = 'all' | 'active' | 'completed' | 'failed'
@@ -228,16 +229,8 @@ export function TaskBoard({ tasks }: { tasks: TaskJob[] }) {
           ) : (
             filtered.map((task, i) => {
               const meta = statusMeta(task.status)
-              return (
-                <motion.article
-                  key={task.id}
-                  layout
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.97 }}
-                  transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                  className="group flex items-center justify-between gap-3 rounded-[22px] border border-black/[0.05] bg-white/90 p-4 shadow-[var(--shadow-sm)] backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:border-black/[0.09] hover:shadow-[var(--shadow-md)]"
-                >
+              const body = (
+                <>
                   <div className="min-w-0 space-y-1.5">
                     <p className="truncate text-[13px] font-semibold">{task.prompt}</p>
                     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10.5px] text-[var(--muted-foreground)]">
@@ -250,12 +243,44 @@ export function TaskBoard({ tasks }: { tasks: TaskJob[] }) {
                     </div>
                   </div>
 
-                  <span
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[9.5px] font-bold uppercase tracking-wide ${meta.cls}`}
-                  >
-                    <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
-                    {meta.label}
+                  <span className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[9.5px] font-bold uppercase tracking-wide ${meta.cls}`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} />
+                      {meta.label}
+                    </span>
+                    {task.conversation_id && (
+                      <ArrowRight className="h-3.5 w-3.5 text-[var(--muted-foreground)] opacity-0 transition-all duration-300 group-hover:translate-x-0.5 group-hover:opacity-100" />
+                    )}
                   </span>
+                </>
+              )
+
+              const cardCls =
+                'group flex items-center justify-between gap-3 rounded-[22px] border border-black/[0.05] bg-white/90 p-4 shadow-[var(--shadow-sm)] backdrop-blur transition-all duration-300 hover:-translate-y-0.5 hover:border-black/[0.09] hover:shadow-[var(--shadow-md)]'
+
+              return (
+                <motion.article
+                  key={task.id}
+                  layout
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                >
+                  {task.conversation_id ? (
+                    <Link
+                      href={`/c/${task.conversation_id}`}
+                      aria-label={`Open chat for task: ${task.prompt}`}
+                      title="Open this chat"
+                      className={`${cardCls} block`}
+                    >
+                      {body}
+                    </Link>
+                  ) : (
+                    <div className={cardCls}>{body}</div>
+                  )}
                 </motion.article>
               )
             })

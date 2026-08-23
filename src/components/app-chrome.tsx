@@ -22,6 +22,18 @@ export interface Repository {
   default_branch: string
 }
 
+/** Defensive dedupe — React keys + selection both assume unique ids/names. */
+function dedupeRepos(list: Repository[]): Repository[] {
+  const seenId = new Set<string>()
+  const seenName = new Set<string>()
+  return list.filter((repo) => {
+    if (!repo.id || seenId.has(repo.id) || seenName.has(repo.repo_name)) return false
+    seenId.add(repo.id)
+    seenName.add(repo.repo_name)
+    return true
+  })
+}
+
 interface AppChromeValue {
   user: AppChromeProps['user']
   repositories: Repository[]
@@ -63,7 +75,7 @@ export function AppChrome({ user, initialRepositories, bodyClassName, children }
   const router = useRouter()
   const pathname = usePathname()
 
-  const [repositories, setRepositories] = useState<Repository[]>(initialRepositories)
+  const [repositories, setRepositories] = useState<Repository[]>(() => dedupeRepos(initialRepositories))
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -84,8 +96,9 @@ export function AppChrome({ user, initialRepositories, bodyClassName, children }
       const res = await fetch('/api/repos/sync', { method: 'POST' })
       const data = await res.json()
       if (res.ok && Array.isArray(data.repos)) {
-        setRepositories(data.repos as Repository[])
-        return data.repos as Repository[]
+        const repos = dedupeRepos(data.repos as Repository[])
+        setRepositories(repos)
+        return repos
       }
       return []
     } finally {

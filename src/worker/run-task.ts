@@ -16,13 +16,18 @@ export interface ChatMessage {
   content: string
 }
 
+export interface TokenUsage {
+  input: number
+  output: number
+}
+
 /** The only AI touchpoint — injectable so the pipeline is testable without keys. */
-export type ModelCaller = (messages: ChatMessage[]) => Promise<string>
+export type ModelCaller = (messages: ChatMessage[]) => Promise<{ text: string; usage: TokenUsage }>
 
 export interface RunTaskDeps {
   model: ModelCaller
   log: (level: string, message: string) => Promise<void>
-  setStatus: (status: string, diffContent?: string) => Promise<void>
+  setStatus: (status: string, diffContent?: string, usage?: TokenUsage) => Promise<void>
   sandboxRoot: string
   defaultBranch: string
   token?: string | null
@@ -159,9 +164,12 @@ export async function runTask(job: TaskJob, deps: RunTaskDeps): Promise<void> {
 
     // ---------- ACI tool-call loop ----------
     let modelEdits = 0
+    const usageTotal: TokenUsage = { input: 0, output: 0 }
     for (let turn = 1; turn <= MAX_MODEL_TURNS; turn++) {
       await deps.log('info', `Thinking (step ${turn} of ${MAX_MODEL_TURNS})…`)
-      const raw = await deps.model(messages)
+      const { text: raw, usage } = await deps.model(messages)
+      usageTotal.input += usage.input
+      usageTotal.output += usage.output
 
       if (!raw.trim()) {
         await deps.log('error', 'The model returned an empty response.')
@@ -231,9 +239,11 @@ export async function runTask(job: TaskJob, deps: RunTaskDeps): Promise<void> {
         content: `The syntax/build check FAILED with:\n\n${check.output.slice(0, 6000)}\n\nFix the failing files. Respond with a JSON array of tool calls.`,
       })
 
-      const raw = await deps.model(messages)
-      messages.push({ role: 'assistant', content: raw })
-      const calls = parseToolCalls(raw)
+      const healResult = await deps.model(messages)
+      usageTotal.input += healResult.usage.input
+      usageTotal.output += healResult.usage.output
+      messages.push({ role: 'assistant', content: healResult.text })
+      const calls = parseToolCalls(healResult.text)
       if (calls.length === 0) {
         await deps.log('error', 'Self-heal response was not a valid tool-call array.')
         continue
@@ -263,8 +273,11 @@ export async function runTask(job: TaskJob, deps: RunTaskDeps): Promise<void> {
 
     const additions = diff.split('\n').filter((l) => l.startsWith('+') && !l.startsWith('+++')).length
     const deletions = diff.split('\n').filter((l) => l.startsWith('-') && !l.startsWith('---')).length
-    await deps.log('success', `Changes ready for review: +${additions} / -${deletions} lines.`)
-    await deps.setStatus('verifying', diff)
+    await deps.log(
+      'success',
+      `Changes ready for review: +${additions} / -${deletions} lines · ${(usageTotal.input + usageTotal.output).toLocaleString()} tokens used.`,
+    )
+    await deps.setStatus('verifying', diff, usageTotal)
   } catch (err: unknown) {
     const message =
       err instanceof GitAgentError
