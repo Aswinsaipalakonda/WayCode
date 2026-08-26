@@ -22,12 +22,23 @@ export const metadata: Metadata = {
   title: "WayCode — Ship code from anywhere",
   description:
     "Describe the change in plain language. WayCode branches, codes, builds — you review the diff and ship.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "WayCode",
+  },
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
   themeColor: "#f8f8f6",
   width: "device-width",
   initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
