@@ -241,8 +241,24 @@ async function processJob(jobPayload: string) {
   }
 }
 
+/** Liveness marker for /api/health — best-effort, never interrupts the loop. */
+function startHeartbeat() {
+  const beat = async () => {
+    try {
+      await supabase
+        .from('daemon_status')
+        .upsert({ id: 'singleton', last_beat: new Date().toISOString() }, { onConflict: 'id' })
+    } catch (err) {
+      console.error('[Daemon] Heartbeat failed:', err)
+    }
+  }
+  void beat()
+  return setInterval(() => void beat(), 30_000)
+}
+
 async function startDaemon() {
-  console.log('ðŸš€ WayCode ACI daemon running â€” waiting for jobsâ€¦')
+  console.log('🚀 WayCode ACI daemon running — waiting for jobs…')
+  startHeartbeat()
   if (!redis.status || redis.status === 'wait') {
     await redis.connect().catch((err: unknown) => {
       console.error('[Daemon] Redis connect failed:', err)

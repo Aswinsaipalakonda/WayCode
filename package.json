@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "worker": "tsx --env-file-if-exists=.env.local src/worker/daemon.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:pipeline": "tsx --env-file-if-exists=.env.local scripts/test-pipeline.ts",
     "test:crypto": "tsx --env-file-if-exists=.env.local scripts/test-crypto.ts"
   },
@@ -42,6 +44,7 @@
     "eslint-config-next": "16.3.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.12",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.11"
   }
 }

@@ -93,14 +93,14 @@ export function parseToolCalls(raw: string): ToolCall[] {
 }
 
 /** Resolve a tool path inside the sandbox, rejecting traversal outside it. */
-function safePath(sandboxDir: string, relPath: string): string | null {
+export function safePath(sandboxDir: string, relPath: string): string | null {
   const resolved = path.resolve(sandboxDir, relPath)
   const root = path.resolve(sandboxDir)
   if (!resolved.startsWith(root + path.sep) && resolved !== root) return null
   return resolved
 }
 
-function executeToolCalls(calls: ToolCall[], sandboxDir: string): string[] {
+export function executeToolCalls(calls: ToolCall[], sandboxDir: string): string[] {
   const results: string[] = []
 
   for (const call of calls) {
@@ -145,7 +145,7 @@ function executeToolCalls(calls: ToolCall[], sandboxDir: string): string[] {
 }
 
 /** Render optional context attachments as an extra section of the first turn. */
-function formatContextBlock(ctx?: TaskContext | null): string {
+export function formatContextBlock(ctx?: TaskContext | null): string {
   if (!ctx) return ''
   const parts: string[] = []
   if (ctx.filePath) parts.push(`- Relevant file path: ${ctx.filePath}`)
