@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import Redis from 'ioredis'
 import { decryptSecret } from '../lib/crypto'
 import { resolveProvider, type EffectiveProvider } from '../lib/byok'
+import { sendPushToUser } from '../lib/push'
 import { runTask, type ChatMessage, type ModelCaller, type TaskContext } from './run-task'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -28,7 +29,12 @@ async function writeLog(taskId: string, logLevel: string, message: string) {
 async function updateJobStatus(
   taskId: string,
   status: string,
-  extra?: { diffContent?: string; usage?: { input: number; output: number }; model?: string },
+  extra?: {
+    diffContent?: string
+    usage?: { input: number; output: number }
+    model?: string
+    userId?: string
+  },
 ) {
   const updateData: Record<string, unknown> = { status, updated_at: new Date().toISOString() }
   if (extra?.diffContent) updateData.diff_content = extra.diffContent
@@ -38,6 +44,20 @@ async function updateJobStatus(
     updateData.output_tokens = Math.round(extra.usage.output)
   }
   await supabase.from('task_jobs').update(updateData).eq('id', taskId)
+
+  // Review-ready / failed are the moments a developer wants to hear about
+  // while away from the app (PRD §5.7). Fire-and-forget — never blocks jobs.
+  if ((status === 'verifying' || status === 'failed') && extra?.userId) {
+    void sendPushToUser(supabase, extra.userId, {
+      title: status === 'verifying' ? 'Changes ready for review' : 'Task needs attention',
+      body:
+        status === 'verifying'
+          ? 'The build passed — approve the diff to ship it to GitHub.'
+          : 'The agent hit a wall on this one. Check the task logs.',
+      url: '/tasks',
+      tag: taskId,
+    })
+  }
 }
 
 interface UserSettingsRow {
@@ -207,7 +227,7 @@ async function processJob(jobPayload: string) {
         model: makeModelCaller(apiKey, provider, model, settings?.custom_base_url ?? null),
         log: (level, message) => writeLog(job.taskId, level, message),
         setStatus: (status, diffContent, usage) =>
-          updateJobStatus(job.taskId, status, { diffContent, model, usage }),
+          updateJobStatus(job.taskId, status, { diffContent, model, usage, userId: job.userId }),
         sandboxRoot: path.join(process.cwd(), '.sandbox'),
         defaultBranch: repoRow?.default_branch || 'main',
         token: githubToken,

@@ -9,6 +9,7 @@ import {
   GitAgentError,
   landApprovedDiff,
 } from '@/lib/git-agent'
+import { sendPushToUser } from '@/lib/push'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -148,6 +149,16 @@ export async function POST(request: Request) {
       message: pr
         ? `[SHIPPED] Pushed ${pushedBranch} and opened pull request #${pr.number}: ${pr.url}`
         : `[SHIPPED] Pushed branch ${pushedBranch} to GitHub.`,
+    })
+
+    // "Shipped" push — closes the loop for users who left after approving.
+    void sendPushToUser(admin, user.id, {
+      title: 'Shipped to GitHub 🚀',
+      body: pr
+        ? `Pull request #${pr.number} opened — deployment will follow automatically.`
+        : `Branch ${pushedBranch} pushed.`,
+      url: '/tasks',
+      tag: taskId,
     })
 
     return NextResponse.json({

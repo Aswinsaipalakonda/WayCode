@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { AppChrome } from '@/components/app-chrome'
+import { NotificationToggle } from '@/components/notification-toggle'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import { Mail, GitBranch, LogOut, AtSign, BadgeCheck } from 'lucide-react'
@@ -115,6 +116,14 @@ export default async function ProfilePage() {
                 GitHub OAuth
               </span>
             </div>
+          </div>
+
+          {/* Notifications */}
+          <div className="anim-fade-up space-y-2.5">
+            <p className="px-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted-foreground)]">
+              Notifications
+            </p>
+            <NotificationToggle />
           </div>
 
           {/* Sign out */}
