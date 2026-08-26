@@ -59,6 +59,33 @@ interface HydratedTaskRow {
 
 const MAX_LEN = 2000
 
+/** Optional intent attachments (PRD §7.3). */
+interface ContextDraft {
+  filePath: string
+  issueNumber: string
+  errorStack: string
+}
+
+const EMPTY_CONTEXT: ContextDraft = { filePath: '', issueNumber: '', errorStack: '' }
+
+function hasContextDraft(d: ContextDraft): boolean {
+  return !!(d.filePath.trim() || d.issueNumber.trim() || d.errorStack.trim())
+}
+
+function contextFromDraft(d: ContextDraft):
+  | { filePath?: string; issueNumber?: number; errorStack?: string }
+  | null {
+  const filePath = d.filePath.trim()
+  const issueNumber = Number.parseInt(d.issueNumber.trim(), 10)
+  const errorStack = d.errorStack.trim()
+  if (!filePath && !errorStack && !Number.isFinite(issueNumber)) return null
+  return {
+    ...(filePath ? { filePath } : {}),
+    ...(Number.isFinite(issueNumber) ? { issueNumber } : {}),
+    ...(errorStack ? { errorStack } : {}),
+  }
+}
+
 function nowTime() {
   return new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
@@ -87,6 +114,8 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
   const [hydrating, setHydrating] = useState(Boolean(conversation?.id))
   const [prompt, setPrompt] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showAttachments, setShowAttachments] = useState(false)
+  const [contextDraft, setContextDraft] = useState<ContextDraft>(EMPTY_CONTEXT)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -218,6 +247,8 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
     setPrompt('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setIsSubmitting(true)
+    const context = contextFromDraft(contextDraft)
+    setShowAttachments(false)
 
     try {
       const res = await fetch('/api/tasks/submit', {
@@ -231,11 +262,13 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
           ...(conversation
             ? { conversationId: conversation.id }
             : { startConversation: true }),
+          ...(context ? { context } : {}),
         }),
       })
       const data = await res.json()
 
       if (res.status === 202 && data.success) {
+        setContextDraft(EMPTY_CONTEXT)
         setMessages((prev) => [
           ...prev,
           {
@@ -487,6 +520,85 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
               )}
             </div>
 
+            {/* Context attachments panel (PRD §7.3) */}
+            <AnimatePresence initial={false}>
+              {showAttachments && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mb-2 space-y-2 rounded-2xl border border-black/[0.06] bg-white/85 p-2.5">
+                    <div className="flex items-center justify-between px-0.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                        Context for the agent
+                      </p>
+                      {hasContextDraft(contextDraft) && (
+                        <button
+                          type="button"
+                          onClick={() => setContextDraft(EMPTY_CONTEXT)}
+                          className="pressable text-[10px] font-bold text-[var(--error)] hover:underline"
+                        >
+                          Clear all
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 xs:grid-cols-2">
+                      <label className="block">
+                        <span className="mb-1 block px-0.5 text-[10px] font-semibold text-[var(--foreground-secondary)]">
+                          File path
+                        </span>
+                        <input
+                          type="text"
+                          value={contextDraft.filePath}
+                          onChange={(e) =>
+                            setContextDraft((d) => ({ ...d, filePath: e.target.value.slice(0, 512) }))
+                          }
+                          placeholder="src/app/api/checkout.ts"
+                          className="w-full rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 font-mono-code text-[11px] outline-none placeholder:text-[var(--muted-foreground)] focus:border-[var(--brand)]"
+                        />
+                      </label>
+                      <label className="block">
+                        <span className="mb-1 block px-0.5 text-[10px] font-semibold text-[var(--foreground-secondary)]">
+                          GitHub issue #
+                        </span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={contextDraft.issueNumber}
+                          onChange={(e) =>
+                            setContextDraft((d) => ({ ...d, issueNumber: e.target.value.slice(0, 9) }))
+                          }
+                          placeholder="42"
+                          className="w-full rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 font-mono-code text-[11px] outline-none placeholder:text-[var(--muted-foreground)] focus:border-[var(--brand)]"
+                        />
+                      </label>
+                    </div>
+                    <label className="block">
+                      <span className="mb-1 block px-0.5 text-[10px] font-semibold text-[var(--foreground-secondary)]">
+                        Error stack / output
+                      </span>
+                      <textarea
+                        value={contextDraft.errorStack}
+                        onChange={(e) =>
+                          setContextDraft((d) => ({ ...d, errorStack: e.target.value.slice(0, 4000) }))
+                        }
+                        rows={3}
+                        maxLength={4000}
+                        placeholder="Paste the stack trace or failing output…"
+                        className="w-full resize-none rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 font-mono-code text-[11px] leading-relaxed outline-none placeholder:text-[var(--muted-foreground)] focus:border-[var(--brand)]"
+                      />
+                    </label>
+                    <p className="px-0.5 text-right text-[9px] font-medium text-[var(--muted-foreground)]">
+                      Folded into the agent&apos;s brief · {contextDraft.errorStack.length}/4000
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <textarea
               ref={textareaRef}
               value={prompt}
@@ -504,10 +616,15 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
             <div className="mt-2 flex items-center justify-between pl-0.5 pr-0.5">
               <button
                 type="button"
-                onClick={() => toast('Attachments', { description: 'Context files are coming soon.' })}
-                aria-label="Attach file"
-                title="Attach file"
-                className="pressable rounded-full p-2 text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]"
+                onClick={() => setShowAttachments((v) => !v)}
+                aria-expanded={showAttachments}
+                aria-label="Attach context"
+                title="Attach context (file, issue, stack trace)"
+                className={`pressable rounded-full p-2 ${
+                  hasContextDraft(contextDraft)
+                    ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
+                    : 'text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]'
+                }`}
               >
                 <Paperclip className="h-[18px] w-[18px]" />
               </button>

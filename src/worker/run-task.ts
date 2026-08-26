@@ -3,12 +3,21 @@ import path from 'path'
 import { createSandbox, generateWorkingDiff, GitAgentError } from '../lib/git-agent'
 import { edit_file, list_files, read_file, run_syntax_check } from './tools'
 
+export interface TaskContext {
+  filePath?: string
+  issueNumber?: number
+  issueReference?: string | null
+  errorStack?: string
+}
+
 export interface TaskJob {
   taskId: string
   userId: string
   repoName: string
   branchName: string
   prompt: string
+  /** Optional intent attachments (PRD §7.3) folded into the first turn only. */
+  context?: TaskContext | null
 }
 
 export interface ChatMessage {
@@ -135,6 +144,18 @@ function executeToolCalls(calls: ToolCall[], sandboxDir: string): string[] {
   return results
 }
 
+/** Render optional context attachments as an extra section of the first turn. */
+function formatContextBlock(ctx?: TaskContext | null): string {
+  if (!ctx) return ''
+  const parts: string[] = []
+  if (ctx.filePath) parts.push(`- Relevant file path: ${ctx.filePath}`)
+  if (ctx.issueReference) parts.push(`- Linked issue: ${ctx.issueReference}`)
+  else if (ctx.issueNumber) parts.push(`- Linked GitHub issue: #${ctx.issueNumber}`)
+  if (ctx.errorStack) parts.push(`- Pasted error output:\n<error>\n${ctx.errorStack}\n</error>`)
+  if (parts.length === 0) return ''
+  return `\n\nContext attachments:\n${parts.join('\n')}`
+}
+
 export async function runTask(job: TaskJob, deps: RunTaskDeps): Promise<void> {
   const sandboxDir = path.join(deps.sandboxRoot, job.taskId)
 
@@ -154,11 +175,16 @@ export async function runTask(job: TaskJob, deps: RunTaskDeps): Promise<void> {
     const files = list_files(sandboxDir)
     await deps.log('info', `Scanned the repository — ${files.length} files in scope.`)
 
+    const contextBlock = formatContextBlock(job.context)
+    if (contextBlock) {
+      await deps.log('info', 'Context attachments folded into the task brief.')
+    }
+
     const messages: ChatMessage[] = [
       { role: 'system', content: SYSTEM_PROMPT },
       {
         role: 'user',
-        content: `Repository: ${job.repoName}\nIntent: ${job.prompt}\n\nBegin. Respond with a JSON array of tool calls.`,
+        content: `Repository: ${job.repoName}\nIntent: ${job.prompt}${contextBlock}\n\nBegin. Respond with a JSON array of tool calls.`,
       },
     ]
 

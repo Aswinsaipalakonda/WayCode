@@ -3,7 +3,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import Redis from 'ioredis'
 import { decryptSecret } from '../lib/crypto'
 import { resolveProvider, type EffectiveProvider } from '../lib/byok'
-import { runTask, type ChatMessage, type ModelCaller } from './run-task'
+import { runTask, type ChatMessage, type ModelCaller, type TaskContext } from './run-task'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
@@ -147,6 +147,7 @@ async function processJob(jobPayload: string) {
     repoName: string
     branchName: string
     prompt: string
+    context?: TaskContext | null
   }
 
   try {
@@ -200,6 +201,7 @@ async function processJob(jobPayload: string) {
         repoName: job.repoName,
         branchName: job.branchName,
         prompt: job.prompt,
+        context: job.context ?? null,
       },
       {
         model: makeModelCaller(apiKey, provider, model, settings?.custom_base_url ?? null),

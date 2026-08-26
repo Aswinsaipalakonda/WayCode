@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { decryptSecret } from '@/lib/crypto'
 import { redis } from '@/lib/redis'
 import { NextResponse } from 'next/server'
 
@@ -7,6 +9,56 @@ const MAX_PROMPT_CHARS = 2000
 const MAX_SUBMISSIONS_PER_MINUTE = 6
 /** Backpressure — concurrent non-terminal jobs allowed per user. */
 const MAX_ACTIVE_JOBS = 10
+
+const MAX_FILE_PATH_CHARS = 512
+const MAX_ERROR_STACK_CHARS = 4000
+
+interface TaskContext {
+  filePath?: string
+  issueNumber?: number
+  issueReference?: string | null
+  errorStack?: string
+}
+
+/** Best-effort fetch of a GitHub issue's body so the agent gets real content,
+ *  not just a number it cannot look up (the sandbox has no web access). */
+async function resolveIssueContext(
+  repoName: string,
+  issueNumber: number,
+  githubToken: string | null,
+): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${repoName}/issues/${issueNumber}`,
+      {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          ...(githubToken ? { Authorization: `Bearer ${githubToken}` } : {}),
+        },
+        signal: AbortSignal.timeout(3000),
+      },
+    )
+    if (!res.ok) return null
+    const data = (await res.json()) as {
+      title?: string
+      body?: string
+      html_url?: string
+      state?: string
+    }
+    if (!data.title) return null
+    const body = (data.body || '').slice(0, 1500)
+    return [
+      `GitHub issue #${issueNumber}${data.state ? ` (${data.state})` : ''}: ${data.title}`,
+      data.html_url ? `(${data.html_url})` : '',
+      body ? `\n${body}` : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim()
+  } catch {
+    return null
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -17,7 +69,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { prompt, repoId, repoName, conversationId, startConversation } = await request.json()
+    const { prompt, repoId, repoName, conversationId, startConversation, context } =
+      (await request.json()) as {
+        prompt?: string
+        repoId?: string
+        repoName?: string
+        conversationId?: string
+        startConversation?: boolean
+        context?: {
+          filePath?: string
+          issueNumber?: number | string
+          errorStack?: string
+        }
+      }
 
     if (!prompt || !prompt.trim()) {
       return NextResponse.json({ error: 'Prompt intent is required' }, { status: 400 })
@@ -27,6 +91,22 @@ export async function POST(request: Request) {
         { error: `Prompt exceeds the ${MAX_PROMPT_CHARS}-character limit` },
         { status: 400 },
       )
+    }
+
+    // Normalize + validate optional context attachments (PRD §7.3).
+    let taskContext: TaskContext | null = null
+    if (context && typeof context === 'object') {
+      const filePath = typeof context.filePath === 'string' ? context.filePath.trim().slice(0, MAX_FILE_PATH_CHARS) : ''
+      const errorStack = typeof context.errorStack === 'string' ? context.errorStack.trim().slice(0, MAX_ERROR_STACK_CHARS) : ''
+      const issueNumber = Number.parseInt(String(context.issueNumber ?? ''), 10)
+
+      if (filePath || errorStack || Number.isFinite(issueNumber)) {
+        taskContext = {
+          ...(filePath ? { filePath } : {}),
+          ...(Number.isFinite(issueNumber) && issueNumber > 0 ? { issueNumber } : {}),
+          ...(errorStack ? { errorStack } : {}),
+        }
+      }
     }
 
     // Queue-level backpressure — protect the daemon from a runaway client.
@@ -102,6 +182,26 @@ export async function POST(request: Request) {
       resolvedConversationId = conv.id
     }
 
+    // Resolve a linked GitHub issue into real content for the agent's prompt.
+    // Best-effort: falls back to a plain "#N" reference when unreachable.
+    if (taskContext?.issueNumber && repoName) {
+      let githubToken: string | null = null
+      try {
+        const admin = createAdminClient()
+        const { data: settings } = await admin
+          .from('user_settings')
+          .select('github_token')
+          .eq('user_id', user.id)
+          .single()
+        const raw = settings?.github_token
+        if (raw) githubToken = raw.startsWith('v1:') ? decryptSecret(raw) : raw
+      } catch {
+        /* token lookup is optional */
+      }
+      taskContext.issueReference =
+        await resolveIssueContext(repoName, taskContext.issueNumber, githubToken)
+    }
+
     // 3. Insert new task job record into Supabase (Status: queued)
     const { data: job, error: jobError } = await supabase
       .from('task_jobs')
@@ -112,6 +212,7 @@ export async function POST(request: Request) {
         status: 'queued',
         branch_name: `waycode/task-${Math.random().toString(36).substring(2, 8)}`,
         ...(resolvedConversationId ? { conversation_id: resolvedConversationId } : {}),
+        ...(taskContext ? { context_json: taskContext } : {}),
       })
       .select()
       .single()
@@ -144,6 +245,7 @@ export async function POST(request: Request) {
       repoName: repoName || '',
       prompt,
       branchName: job.branch_name,
+      ...(taskContext ? { context: taskContext } : {}),
     })
 
     try {
