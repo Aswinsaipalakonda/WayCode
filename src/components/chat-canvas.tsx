@@ -179,6 +179,23 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
     if (repo) onSelectRepo(repo)
   }, [conversationRepoId, repositories, selectedRepo?.id, onSelectRepo])
 
+  // A rejected diff re-queued with reviewer feedback appears instantly as a
+  // new user bubble + agent card — mirroring exactly what hydration renders.
+  const handleRetryQueued = useCallback(
+    (info: { taskId: string; branchName: string; prompt: string }) => {
+      setMessages((prev) => [
+        ...prev,
+        { id: `u-${info.taskId}`, role: 'user', text: info.prompt, time: nowTime() },
+        {
+          id: `t-${info.taskId}`,
+          role: 'assistant',
+          task: { taskId: info.taskId, branchName: info.branchName },
+        },
+      ])
+    },
+    [],
+  )
+
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPrompt(e.target.value.slice(0, MAX_LEN))
     const el = e.target
@@ -385,7 +402,7 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
                   )}
                 </motion.div>
               ) : message.task ? (
-                <TaskCard key={message.id} task={message.task} />
+                <TaskCard key={message.id} task={message.task} onRetryQueued={handleRetryQueued} />
               ) : null
             )}
 
@@ -535,7 +552,13 @@ const PIPELINE_STEPS = [
   { key: 'review', label: 'Review', hint: 'Diff is ready — nothing ships until you approve' },
 ] as const
 
-function TaskCard({ task }: { task: QueuedTask }) {
+function TaskCard({
+  task,
+  onRetryQueued,
+}: {
+  task: QueuedTask
+  onRetryQueued?: (info: { taskId: string; branchName: string; prompt: string }) => void
+}) {
   const supabase = createClient()
   const [status, setStatus] = useState<string>('queued')
   const [diffContent, setDiffContent] = useState<string | null>(null)
@@ -792,6 +815,10 @@ function TaskCard({ task }: { task: QueuedTask }) {
         taskId={task.taskId}
         branchName={task.branchName}
         diffContent={diffContent ?? ''}
+        onRetryQueued={(info) => {
+          setReviewOpen(false)
+          onRetryQueued?.(info)
+        }}
         decision={
           statusLower === 'rejected'
             ? 'rejected'

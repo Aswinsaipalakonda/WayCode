@@ -134,7 +134,12 @@ export async function POST(request: Request) {
 
     await supabase
       .from('task_jobs')
-      .update({ status: 'completed', updated_at: new Date().toISOString() })
+      .update({
+        status: 'completed',
+        approved_by: user.id,
+        approved_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', taskId)
 
     await supabase.from('task_logs').insert({

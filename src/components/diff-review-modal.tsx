@@ -3,7 +3,24 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { toast } from 'sonner'
-import { FileCode2, GitPullRequest, GitBranch, X, Loader2, ThumbsDown, CheckCircle2, Plus, Minus } from 'lucide-react'
+import {
+  CheckCircle2,
+  FileCode2,
+  GitBranch,
+  GitPullRequest,
+  Loader2,
+  MessageSquareWarning,
+  Minus,
+  Plus,
+  ThumbsDown,
+  X,
+} from 'lucide-react'
+
+interface RetryQueuedInfo {
+  taskId: string
+  branchName: string
+  prompt: string
+}
 
 interface DiffReviewModalProps {
   isOpen: boolean
@@ -13,12 +30,24 @@ interface DiffReviewModalProps {
   diffContent: string
   /** Set once the user has decided — the modal becomes read-only history. */
   decision?: 'pushed' | 'rejected' | null
+  /** Fired when a rejection re-queues as a fresh task carrying reviewer feedback. */
+  onRetryQueued?: (info: RetryQueuedInfo) => void
 }
 
-export function DiffReviewModal({ isOpen, onClose, taskId, branchName, diffContent, decision = null }: DiffReviewModalProps) {
+export function DiffReviewModal({
+  isOpen,
+  onClose,
+  taskId,
+  branchName,
+  diffContent,
+  decision = null,
+  onRetryQueued,
+}: DiffReviewModalProps) {
   const [isApproving, setIsApproving] = useState(false)
   const [isRejecting, setIsRejecting] = useState(false)
   const [result, setResult] = useState<'approved' | 'rejected' | null>(null)
+  const [showRejectPanel, setShowRejectPanel] = useState(false)
+  const [reason, setReason] = useState('')
 
   const lines = diffContent ? diffContent.split('\n') : []
   const additions = lines.filter((l) => l.startsWith('+') && !l.startsWith('+++')).length
@@ -50,21 +79,37 @@ export function DiffReviewModal({ isOpen, onClose, taskId, branchName, diffConte
     }
   }
 
-  const handleReject = async () => {
+  const handleReject = async (retryReason?: string) => {
     setIsRejecting(true)
     try {
       const res = await fetch('/api/tasks/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId }),
+        body: JSON.stringify({ taskId, ...(retryReason ? { reason: retryReason } : {}) }),
       })
-      if (res.ok) {
-        setResult('rejected')
-        toast.info('Task rejected', { description: 'The working branch was discarded. Nothing was pushed.' })
-        setTimeout(onClose, 1400)
-      } else {
-        toast.error('Rejection failed', { description: 'Could not discard this task.' })
+      const data = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        toast.error('Rejection failed', { description: data.error || 'Could not discard this task.' })
+        return
       }
+
+      setResult('rejected')
+      if (data.retried) {
+        toast.success('Re-running with your feedback', {
+          description: `A fresh attempt was queued · ${data.branchName}`,
+        })
+        onRetryQueued?.({
+          taskId: data.taskId,
+          branchName: data.branchName,
+          prompt: data.prompt,
+        })
+      } else if (data.message?.includes('repository could not be resolved') || data.message?.includes('queueing the retry')) {
+        toast.info('Task rejected', { description: data.message })
+      } else {
+        toast.info('Task rejected', { description: 'The working branch was discarded. Nothing was pushed.' })
+      }
+      setTimeout(onClose, 1400)
     } catch {
       toast.error('Network error', { description: 'Could not reach the rejection endpoint.' })
     } finally {
@@ -158,6 +203,38 @@ export function DiffReviewModal({ isOpen, onClose, taskId, branchName, diffConte
               )}
             </div>
 
+            {/* Rejection feedback — tell the agent what to do differently */}
+            <AnimatePresence>
+              {showRejectPanel && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.22 }}
+                  className="overflow-hidden border-t border-[var(--border)] bg-[var(--surface)]"
+                >
+                  <div className="space-y-2.5 px-4 pt-3">
+                    <label htmlFor={`reject-reason-${taskId}`} className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--foreground-secondary)]">
+                      <MessageSquareWarning className="h-3.5 w-3.5 text-[var(--warning)]" />
+                      What should the agent do differently?
+                    </label>
+                    <textarea
+                      id={`reject-reason-${taskId}`}
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value.slice(0, 1000))}
+                      rows={3}
+                      maxLength={1000}
+                      placeholder="e.g. Keep the existing API shape and only fix the null check… (optional)"
+                      className="w-full resize-none rounded-xl border border-[var(--border-strong)] bg-[var(--card)] px-3 py-2.5 text-xs leading-relaxed outline-none placeholder:text-[var(--muted-foreground)] focus:border-[var(--brand)]"
+                    />
+                    <p className="text-right text-[9.5px] font-medium text-[var(--muted-foreground)]">
+                      Leave empty to discard without a retry · {reason.length}/1000
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Result banner */}
             <AnimatePresence>
               {(result || decision) && (
@@ -174,7 +251,9 @@ export function DiffReviewModal({ isOpen, onClose, taskId, branchName, diffConte
                   <p className="flex items-center justify-center gap-2 py-3">
                     <CheckCircle2 className="h-4 w-4" />
                     {result === 'rejected' || decision === 'rejected'
-                      ? 'Task discarded safely — nothing was pushed'
+                      ? result === 'rejected' && reason.trim()
+                        ? 'Rejected — a fresh attempt with your feedback was queued'
+                        : 'Task discarded safely — nothing was pushed'
                       : 'Pushed to GitHub · PR created · deployment triggered'}
                   </p>
                 </motion.div>
@@ -183,24 +262,65 @@ export function DiffReviewModal({ isOpen, onClose, taskId, branchName, diffConte
 
             {/* Footer actions — hidden once a decision has been made */}
             {!decision && (
-              <div className="flex gap-2.5 border-t border-[var(--border)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-                <button
-                  onClick={handleReject}
-                  disabled={isRejecting || isApproving || !!result}
-                  className="pressable flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[var(--error)]/30 bg-[var(--error-soft)] py-3 text-xs font-bold text-[var(--error)] hover:bg-[var(--error)]/20 disabled:opacity-50"
-                >
-                  {isRejecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ThumbsDown className="h-3.5 w-3.5" />}
-                  Reject
-                </button>
+              <div className="border-t border-[var(--border)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                {showRejectPanel ? (
+                  <div className="flex gap-2.5">
+                    <button
+                      onClick={() => {
+                        setShowRejectPanel(false)
+                        setReason('')
+                      }}
+                      disabled={isRejecting}
+                      className="pressable flex flex-1 items-center justify-center rounded-full border border-[var(--border-strong)] bg-[var(--surface)] py-3 text-xs font-bold text-[var(--foreground-secondary)] hover:border-[var(--error)]/40 disabled:opacity-50"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={() => void handleReject()}
+                      disabled={isRejecting || isApproving || !!result}
+                      className="pressable flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[var(--error)]/30 bg-[var(--error-soft)] py-3 text-xs font-bold text-[var(--error)] hover:bg-[var(--error)]/20 disabled:opacity-50"
+                    >
+                      {isRejecting && !reason.trim() ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <ThumbsDown className="h-3.5 w-3.5" />
+                      )}
+                      Discard only
+                    </button>
+                    <button
+                      onClick={() => void handleReject(reason.trim())}
+                      disabled={isRejecting || isApproving || !!result || !reason.trim()}
+                      className="btn-brand pressable flex flex-[1.6] items-center justify-center gap-1.5 rounded-full py-3 text-xs font-bold disabled:opacity-40"
+                    >
+                      {isRejecting && !!reason.trim() ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <MessageSquareWarning className="h-3.5 w-3.5" />
+                      )}
+                      Retry with feedback
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2.5">
+                    <button
+                      onClick={() => setShowRejectPanel(true)}
+                      disabled={isRejecting || isApproving || !!result}
+                      className="pressable flex flex-1 items-center justify-center gap-1.5 rounded-full border border-[var(--error)]/30 bg-[var(--error-soft)] py-3 text-xs font-bold text-[var(--error)] hover:bg-[var(--error)]/20 disabled:opacity-50"
+                    >
+                      <ThumbsDown className="h-3.5 w-3.5" />
+                      Reject
+                    </button>
 
-                <button
-                  onClick={handleApprove}
-                  disabled={isApproving || isRejecting || !!result}
-                  className="btn-brand pressable flex flex-[1.6] items-center justify-center gap-1.5 rounded-full py-3 text-xs font-bold"
-                >
-                  {isApproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitPullRequest className="h-3.5 w-3.5" />}
-                  Approve & Push to GitHub
-                </button>
+                    <button
+                      onClick={handleApprove}
+                      disabled={isApproving || isRejecting || !!result}
+                      className="btn-brand pressable flex flex-[1.6] items-center justify-center gap-1.5 rounded-full py-3 text-xs font-bold"
+                    >
+                      {isApproving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <GitPullRequest className="h-3.5 w-3.5" />}
+                      Approve & Push to GitHub
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </motion.div>

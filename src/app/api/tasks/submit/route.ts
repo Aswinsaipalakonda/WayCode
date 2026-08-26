@@ -2,6 +2,12 @@ import { createClient } from '@/lib/supabase/server'
 import { redis } from '@/lib/redis'
 import { NextResponse } from 'next/server'
 
+const MAX_PROMPT_CHARS = 2000
+/** Burst guard — submissions per user per rolling minute. */
+const MAX_SUBMISSIONS_PER_MINUTE = 6
+/** Backpressure — concurrent non-terminal jobs allowed per user. */
+const MAX_ACTIVE_JOBS = 10
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -15,6 +21,40 @@ export async function POST(request: Request) {
 
     if (!prompt || !prompt.trim()) {
       return NextResponse.json({ error: 'Prompt intent is required' }, { status: 400 })
+    }
+    if (String(prompt).length > MAX_PROMPT_CHARS) {
+      return NextResponse.json(
+        { error: `Prompt exceeds the ${MAX_PROMPT_CHARS}-character limit` },
+        { status: 400 },
+      )
+    }
+
+    // Queue-level backpressure — protect the daemon from a runaway client.
+    const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString()
+    const [{ count: recentCount }, { count: activeCount }] = await Promise.all([
+      supabase
+        .from('task_jobs')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('created_at', oneMinuteAgo),
+      supabase
+        .from('task_jobs')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .in('status', ['queued', 'processing', 'verifying']),
+    ])
+
+    if ((recentCount ?? 0) >= MAX_SUBMISSIONS_PER_MINUTE) {
+      return NextResponse.json(
+        { error: 'Slow down — too many tasks submitted in the last minute. Try again shortly.' },
+        { status: 429 },
+      )
+    }
+    if ((activeCount ?? 0) >= MAX_ACTIVE_JOBS) {
+      return NextResponse.json(
+        { error: `You already have ${activeCount} tasks in flight. Wait for one to finish first.` },
+        { status: 429 },
+      )
     }
 
     // 1. Verify the repository belongs to the caller (RLS also enforces this on select).
