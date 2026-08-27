@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     // Ownership check — a user may only approve their own jobs.
     const { data: job, error: jobError } = await supabase
       .from('task_jobs')
-      .select('id, user_id, prompt, status, branch_name, diff_content, repo_id')
+      .select('id, user_id, prompt, status, branch_name, diff_content, repo_id, created_at')
       .eq('id', taskId)
       .single()
 
