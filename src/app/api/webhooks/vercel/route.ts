@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getWhatsAppNumber, sendWhatsAppText } from '@/lib/whatsapp'
+import { recordDeployEvent } from '@/lib/deploy-notify'
 import { NextResponse } from 'next/server'
 
 const SUCCESS_EVENTS = new Set(['deployment.succeeded', 'deployment.ready'])
@@ -79,40 +79,29 @@ export async function POST(request: Request) {
     }
 
     if (SUCCESS_EVENTS.has(eventType)) {
-      await supabase.from('task_logs').insert({
-        task_id: job.id,
-        log_level: 'success',
-        message: `[DEPLOYED] ${project} deployed successfully${url ? ` — live at ${url}` : ''}.`,
-      })
-
-      // Out-of-band confirmation with the live URL (PRD §7.7).
-      const number = await getWhatsAppNumber(supabase, job.user_id)
-      if (number) {
-        const repoShort = String(job.prompt).slice(0, 90)
-        const text =
-          `✅ WayCode deployment succeeded\n\n` +
-          `Task: ${repoShort}${String(job.prompt).length > 90 ? '…' : ''}\n` +
-          `Branch: ${branch}\n` +
-          (url ? `\n🔗 Live: ${url}` : '')
-        const sent = await sendWhatsAppText(number, text)
-        if (sent) {
-          await supabase.from('task_logs').insert({
-            task_id: job.id,
-            log_level: 'success',
-            message: '[WHATSAPP] Deployment confirmation delivered out-of-band.',
-          })
-        }
-      }
-
+      await recordDeployEvent(
+        supabase,
+        { id: job.id, user_id: job.user_id, prompt: job.prompt },
+        {
+          success: true,
+          source: 'Vercel',
+          url,
+          message: `${project} deployed successfully${url ? ` — live at ${url}` : ''}`,
+        },
+      )
       return NextResponse.json({ ok: true, handled: 'deployed' })
     }
 
     if (FAILURE_EVENTS.has(eventType)) {
-      await supabase.from('task_logs').insert({
-        task_id: job.id,
-        log_level: 'error',
-        message: `[DEPLOY FAILED] ${project} reported "${eventType}" for ${branch}.`,
-      })
+      await recordDeployEvent(
+        supabase,
+        { id: job.id, user_id: job.user_id, prompt: job.prompt },
+        {
+          success: false,
+          source: 'Vercel',
+          message: `${project} reported "${eventType}" for ${branch}`,
+        },
+      )
       return NextResponse.json({ ok: true, handled: 'deploy-failed' })
     }
 

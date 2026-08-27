@@ -20,6 +20,7 @@ export interface Repository {
   id: string
   repo_name: string
   default_branch: string
+  deploy_webhook_url?: string | null
 }
 
 /** Defensive dedupe — React keys + selection both assume unique ids/names. */

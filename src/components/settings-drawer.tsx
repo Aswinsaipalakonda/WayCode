@@ -23,8 +23,12 @@ import {
   TbClipboardText,
   TbKey,
   TbTrash,
-  TbListDetails,
+  TbRocket,
+  TbBrandGithub,
+  TbTerminal2,
+  TbRefresh,
 } from 'react-icons/tb'
+import { useAppChrome } from '@/components/app-chrome'
 
 interface SettingsDrawerProps {
   isOpen: boolean
@@ -118,6 +122,108 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
   const [replacingKey, setReplacingKey] = useState(false)
   const [isRemoving, setIsRemoving] = useState(false)
   const [modelPicker, setModelPicker] = useState<null | 'free' | 'all'>(null)
+
+  const chrome = useAppChrome()
+  const repositories = useMemo(() => chrome?.repositories ?? [], [chrome?.repositories])
+  const selectedRepo = chrome?.selectedRepo ?? null
+  const syncRepos = chrome?.syncRepos
+  const isSyncing = chrome?.isSyncing ?? false
+
+  const [activeTab, setActiveTab] = useState<'vault' | 'deploy'>('vault')
+  const [selectedDeployRepoId, setSelectedDeployRepoId] = useState<string>('')
+  const [deployHookUrl, setDeployHookUrl] = useState<string>('')
+  const [isSavingHook, setIsSavingHook] = useState(false)
+  const [isDeletingHook, setIsDeletingHook] = useState(false)
+  const [copiedInbound, setCopiedInbound] = useState(false)
+  const [copiedSnippet, setCopiedSnippet] = useState<string | null>(null)
+  const [inboundSnippetTab, setInboundSnippetTab] = useState<'curl' | 'github'>('curl')
+  const [repoHooks, setRepoHooks] = useState<Record<string, string>>({})
+  const [showPayloadSchema, setShowPayloadSchema] = useState(false)
+
+  const activeDeployRepoId = selectedDeployRepoId || selectedRepo?.id || repositories[0]?.id || ''
+
+  useEffect(() => {
+    if (!activeDeployRepoId) return
+    let ignore = false
+    fetch(`/api/repos/deploy-hook?repoId=${activeDeployRepoId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!ignore && d.success) {
+          const val = d.deployWebhookUrl || ''
+          setDeployHookUrl(val)
+          setRepoHooks((prev) => ({ ...prev, [activeDeployRepoId]: val }))
+        }
+      })
+      .catch(() => {})
+    return () => {
+      ignore = true
+    }
+  }, [activeDeployRepoId])
+
+  const handleSelectDeployRepo = (id: string) => {
+    setSelectedDeployRepoId(id)
+    const cached = repoHooks[id]
+    if (cached !== undefined) {
+      setDeployHookUrl(cached)
+    } else {
+      const matched = repositories.find((r) => r.id === id)
+      setDeployHookUrl(matched?.deploy_webhook_url || '')
+    }
+  }
+
+  const handleSaveHook = async () => {
+    if (!activeDeployRepoId) return
+    setIsSavingHook(true)
+    try {
+      const res = await fetch('/api/repos/deploy-hook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          repoId: activeDeployRepoId,
+          webhookUrl: deployHookUrl.trim() || null,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        toast.error('Failed to save deploy hook', {
+          description: data.error || 'Check that the URL is valid and reachable.',
+        })
+        return
+      }
+      setRepoHooks((prev) => ({ ...prev, [activeDeployRepoId]: data.deployWebhookUrl || '' }))
+      toast.success(data.deployWebhookUrl ? 'Deploy webhook saved' : 'Deploy webhook cleared', {
+        description: data.deployWebhookUrl
+          ? 'WayCode will POST to this hook whenever approved tasks ship.'
+          : 'Webhook removed for this repository.',
+      })
+    } catch {
+      toast.error('Failed to save deploy hook')
+    } finally {
+      setIsSavingHook(false)
+    }
+  }
+
+  const handleDeleteHook = async () => {
+    if (!activeDeployRepoId) return
+    setIsDeletingHook(true)
+    try {
+      const res = await fetch(`/api/repos/deploy-hook?repoId=${activeDeployRepoId}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json()
+      if (res.ok && data.success) {
+        setDeployHookUrl('')
+        setRepoHooks((prev) => ({ ...prev, [activeDeployRepoId]: '' }))
+        toast.success('Deploy webhook removed')
+      } else {
+        toast.error('Failed to remove deploy hook')
+      }
+    } catch {
+      toast.error('Failed to remove deploy hook')
+    } finally {
+      setIsDeletingHook(false)
+    }
+  }
 
   const meta = PROVIDERS.find((p) => p.id === provider)!
   const { apiKey, baseUrl } = credentials[provider]
@@ -451,430 +557,730 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
             className="relative flex h-full w-full max-w-md flex-col border-l border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-lg)]"
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
-              <div className="flex items-center gap-3">
-                <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] text-white shadow-[0_2px_14px_-2px_var(--brand-glow)]">
-                  <TbShieldLock className="h-5 w-5" />
-                </span>
-                <div>
-                  <h2 className="text-sm font-bold tracking-tight">AI Provider Vault</h2>
-                  <p className="text-[11px] text-[var(--muted-foreground)]">
-                    Connectivity · bring your own key · encrypted at rest
-                  </p>
+            <div className="border-b border-[var(--border)] px-5 pt-4">
+              <div className="flex items-center justify-between pb-3">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] text-white shadow-[0_2px_14px_-2px_var(--brand-glow)]">
+                    {activeTab === 'vault' ? <TbShieldLock className="h-5 w-5" /> : <TbRocket className="h-5 w-5" />}
+                  </span>
+                  <div>
+                    <h2 className="text-sm font-bold tracking-tight">
+                      {activeTab === 'vault' ? 'AI Provider Vault' : 'Deploy Webhooks'}
+                    </h2>
+                    <p className="text-[11px] text-[var(--muted-foreground)]">
+                      {activeTab === 'vault'
+                        ? 'Connectivity · bring your own key · encrypted at rest'
+                        : 'Platform-agnostic push-to-deploy · Dokku, Coolify, VPS & AWS'}
+                    </p>
+                  </div>
                 </div>
+                <button
+                  onClick={onClose}
+                  aria-label="Close"
+                  className="pressable rounded-xl p-2 text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--foreground)]"
+                >
+                  <TbX className="h-4.5 w-4.5" />
+                </button>
               </div>
-              <button
-                onClick={onClose}
-                aria-label="Close"
-                className="pressable rounded-xl p-2 text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--foreground)]"
-              >
-                <TbX className="h-4.5 w-4.5" />
-              </button>
+
+              {/* Navigation Tabs */}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('vault')}
+                  className={`pressable flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-semibold transition-colors ${
+                    activeTab === 'vault'
+                      ? 'border-[var(--brand)] text-[var(--brand)]'
+                      : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  <TbShieldLock className="h-4 w-4" /> AI Vault
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('deploy')}
+                  className={`pressable flex items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-semibold transition-colors ${
+                    activeTab === 'deploy'
+                      ? 'border-[var(--brand)] text-[var(--brand)]'
+                      : 'border-transparent text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  <TbRocket className="h-4 w-4" /> Deploy Hooks
+                </button>
+              </div>
             </div>
 
             {/* Body */}
-            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
-              {/* Live status strip */}
-              <motion.div
-                initial={false}
-                animate={{
-                  backgroundColor:
-                    stage === 'connected'
-                      ? 'rgba(20, 158, 83, 0.09)'
-                      : stage === 'error'
-                        ? 'rgba(220, 54, 46, 0.08)'
-                        : stage === 'validating'
-                          ? 'rgba(10, 102, 255, 0.06)'
-                          : 'rgba(24, 28, 38, 0.04)',
-                  borderColor:
-                    stage === 'connected'
-                      ? 'rgba(20, 158, 83, 0.3)'
-                      : stage === 'error'
-                        ? 'rgba(220, 54, 46, 0.28)'
-                        : stage === 'validating'
-                          ? 'rgba(10, 102, 255, 0.25)'
-                          : 'var(--border)',
-                }}
-                transition={{ duration: 0.35 }}
-                className="flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5"
-              >
-                <StatusIcon stage={stage} />
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`text-xs font-bold ${
+            {activeTab === 'vault' ? (
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+                {/* Live status strip */}
+                <motion.div
+                  initial={false}
+                  animate={{
+                    backgroundColor:
                       stage === 'connected'
-                        ? 'text-[var(--success)]'
+                        ? 'rgba(20, 158, 83, 0.09)'
                         : stage === 'error'
-                          ? 'text-[var(--error)]'
-                          : 'text-[var(--foreground-secondary)]'
-                    }`}
-                  >
-                    {stage === 'connected' && statusMsg}
-                    {stage === 'validating' && statusMsg}
-                    {stage === 'error' && 'Connection failed'}
-                    {stage === 'idle' && 'Not validated'}
-                  </p>
-                  <p className="truncate text-[10.5px] text-[var(--muted-foreground)]">
-                    {stage === 'connected' &&
-                      `${latency ? `${latency} round-trip` : 'verified'}${detectedProvider ? ` · routed via ${detectedProvider}` : ''}`}
-                    {(stage === 'idle' || stage === 'validating') &&
-                      (stage === 'validating' ? 'Handshaking with the provider…' : 'Paste your key, then validate to unlock live models.')}
-                    {stage === 'error' && statusMsg}
-                  </p>
-                </div>
-              </motion.div>
-
-              {/* Provider integration cards */}
-              <section className="space-y-2">
-                <SectionLabel icon={<TbPlugConnected className="h-3 w-3" />}>Provider</SectionLabel>
-                <div className="space-y-2">
-                  {PROVIDERS.map((p) => {
-                    const active = provider === p.id
-                    return (
-                      <button
-                        key={p.id}
-                        onClick={() => switchProvider(p.id)}
-                        aria-pressed={active}
-                        className={`pressable group flex w-full items-center gap-3 rounded-2xl border p-3 text-left ${
-                          active
-                            ? 'border-[var(--brand)] bg-[var(--brand-soft)] shadow-[0_0_0_3px_var(--brand-soft)]'
-                            : 'border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--card-hover)]'
-                        }`}
-                      >
-                        <span
-                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105"
-                          style={{ background: active ? p.tint : 'var(--background)' }}
-                        >
-                          <p.Icon className="h-5 w-5" style={{ color: p.color }} />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-[13px] font-bold leading-tight">{p.label}</span>
-                          <span className="mt-0.5 block truncate text-[11px] text-[var(--muted-foreground)]">
-                            {p.hint}
-                          </span>
-                        </span>
-                        {active ? (
-                          <motion.span
-                            initial={{ scale: 0.5, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            transition={{ type: 'spring', stiffness: 500, damping: 26 }}
-                          >
-                            <TbCircleCheckFilled className="h-5 w-5 text-[var(--brand)]" />
-                          </motion.span>
-                        ) : (
-                          <span className="h-5 w-5 shrink-0 rounded-full border-2 border-[var(--border-strong)] transition-colors group-hover:border-[var(--brand)]" />
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
-              </section>
-
-              {/* Custom base URL */}
-              <AnimatePresence initial={false}>
-                {provider === 'custom' && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-                    className="overflow-hidden"
-                  >
-                    <fieldset className="space-y-2">
-                      <legend className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
-                        <TbApi className="h-3 w-3" /> Base URL
-                      </legend>
-                      <input
-                        type="url"
-                        placeholder="https://api.your-provider.com/v1"
-                        value={baseUrl}
-                        onChange={(e) => updateCredentials({ baseUrl: e.target.value })}
-                        className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 font-mono-code text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none transition-all duration-200 focus:border-[var(--brand)] focus:shadow-[0_0_0_3px_var(--brand-soft)]"
-                      />
-                      <p className="text-[10px] text-[var(--muted-foreground)]">
-                        Leave empty when pasting an Anthropic (<code className="font-mono-code">sk-ant-</code>) or OpenRouter key — we detect it automatically.
-                      </p>
-                    </fieldset>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Credentials */}
-              <section className="space-y-2">
-                <SectionLabel
-                  icon={<TbKey className="h-3 w-3" />}
-                  aside={
-                    <span className="flex items-center gap-1 normal-case tracking-normal font-medium text-[var(--success)]">
-                      <TbShieldLock className="h-3 w-3" /> never returned in plaintext
-                    </span>
-                  }
+                          ? 'rgba(220, 54, 46, 0.08)'
+                          : stage === 'validating'
+                            ? 'rgba(10, 102, 255, 0.06)'
+                            : 'rgba(24, 28, 38, 0.04)',
+                    borderColor:
+                      stage === 'connected'
+                        ? 'rgba(20, 158, 83, 0.3)'
+                        : stage === 'error'
+                          ? 'rgba(220, 54, 46, 0.28)'
+                          : stage === 'validating'
+                            ? 'rgba(10, 102, 255, 0.25)'
+                            : 'var(--border)',
+                  }}
+                  transition={{ duration: 0.35 }}
+                  className="flex items-center gap-2.5 rounded-2xl border px-3.5 py-2.5"
                 >
-                  API Key
-                </SectionLabel>
-                {savedVault?.hasKey && !replacingKey ? (
-                  savedVault.keyReadable ? (
-                    <div className="flex items-center gap-2 rounded-xl border border-[var(--success)]/25 bg-[var(--success-soft)] px-3.5 py-2.5">
-                      <TbShieldLock className="h-4 w-4 shrink-0 text-[var(--success)]" />
-                      <code
-                        className="min-w-0 flex-1 truncate font-mono-code text-xs text-[var(--foreground-secondary)]"
-                        title="Stored key (encrypted at rest)"
-                      >
-                        {savedVault.keyHint}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setReplacingKey(true)
-                          updateCredentials({ apiKey: '' })
-                        }}
-                        className="pressable shrink-0 rounded-lg px-2 py-1 text-[10.5px] font-bold text-[var(--brand)] hover:bg-[var(--brand-soft)]"
-                      >
-                        Replace
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleRemoveKey}
-                        disabled={isRemoving}
-                        aria-label="Remove stored API key"
-                        title="Remove key from vault"
-                        className="pressable shrink-0 rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--error-soft)] hover:text-[var(--error)] disabled:opacity-50"
-                      >
-                        {isRemoving ? (
-                          <TbLoaderQuarter className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <TbTrash className="h-4 w-4" />
-                        )}
-                      </button>
+                  <StatusIcon stage={stage} />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`text-xs font-bold ${
+                        stage === 'connected'
+                          ? 'text-[var(--success)]'
+                          : stage === 'error'
+                            ? 'text-[var(--error)]'
+                            : 'text-[var(--foreground-secondary)]'
+                      }`}
+                    >
+                      {stage === 'connected' && statusMsg}
+                      {stage === 'validating' && statusMsg}
+                      {stage === 'error' && 'Connection failed'}
+                      {stage === 'idle' && 'Not validated'}
+                    </p>
+                    <p className="truncate text-[10.5px] text-[var(--muted-foreground)]">
+                      {stage === 'connected' &&
+                        `${latency ? `${latency} round-trip` : 'verified'}${detectedProvider ? ` · routed via ${detectedProvider}` : ''}`}
+                      {(stage === 'idle' || stage === 'validating') &&
+                        (stage === 'validating' ? 'Handshaking with the provider…' : 'Paste your key, then validate to unlock live models.')}
+                      {stage === 'error' && statusMsg}
+                    </p>
+                  </div>
+                </motion.div>
+
+                {/* Provider integration cards */}
+                <section className="space-y-2">
+                  <SectionLabel icon={<TbPlugConnected className="h-3 w-3" />}>Provider</SectionLabel>
+                  <div className="space-y-2">
+                    {PROVIDERS.map((p) => {
+                      const active = provider === p.id
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => switchProvider(p.id)}
+                          aria-pressed={active}
+                          className={`pressable group flex w-full items-center gap-3 rounded-2xl border p-3 text-left ${
+                            active
+                              ? 'border-[var(--brand)] bg-[var(--brand-soft)] shadow-[0_0_0_3px_var(--brand-soft)]'
+                              : 'border-[var(--border)] hover:border-[var(--border-strong)] hover:bg-[var(--card-hover)]'
+                          }`}
+                        >
+                          <span
+                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-transform duration-300 group-hover:scale-105"
+                            style={{ background: active ? p.tint : 'var(--background)' }}
+                          >
+                            <p.Icon className="h-5 w-5" style={{ color: p.color }} />
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-[13px] font-bold leading-tight">{p.label}</span>
+                            <span className="mt-0.5 block truncate text-[11px] text-[var(--muted-foreground)]">
+                              {p.hint}
+                            </span>
+                          </span>
+                          {active ? (
+                            <motion.span
+                              initial={{ scale: 0.5, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              transition={{ type: 'spring', stiffness: 500, damping: 26 }}
+                            >
+                              <TbCircleCheckFilled className="h-5 w-5 text-[var(--brand)]" />
+                            </motion.span>
+                          ) : (
+                            <span className="h-5 w-5 shrink-0 rounded-full border-2 border-[var(--border-strong)] transition-colors group-hover:border-[var(--brand)]" />
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </section>
+
+                {/* Custom base URL */}
+                <AnimatePresence initial={false}>
+                  {provider === 'custom' && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+                      className="overflow-hidden"
+                    >
+                      <fieldset className="space-y-2">
+                        <legend className="mb-2 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
+                          <TbApi className="h-3 w-3" /> Base URL
+                        </legend>
+                        <input
+                          type="url"
+                          placeholder="https://api.your-provider.com/v1"
+                          value={baseUrl}
+                          onChange={(e) => updateCredentials({ baseUrl: e.target.value })}
+                          className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 font-mono-code text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none transition-all duration-200 focus:border-[var(--brand)] focus:shadow-[0_0_0_3px_var(--brand-soft)]"
+                        />
+                        <p className="text-[10px] text-[var(--muted-foreground)]">
+                          Leave empty when pasting an Anthropic (<code className="font-mono-code">sk-ant-</code>) or OpenRouter key — we detect it automatically.
+                        </p>
+                      </fieldset>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                {/* Key management */}
+                <section className="space-y-2">
+                  <SectionLabel
+                    icon={<TbKey className="h-3 w-3" />}
+                    aside={
+                      savedVault?.hasKey ? (
+                        <span className="flex items-center gap-1 text-[10px] font-semibold text-[var(--success)]">
+                          <TbCircleCheckFilled className="h-3.5 w-3.5" /> vault key active
+                        </span>
+                      ) : undefined
+                    }
+                  >
+                    API Key
+                  </SectionLabel>
+
+                  {savedVault?.hasKey && !replacingKey ? (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2.5">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono-code text-xs text-[var(--foreground)]">
+                            {savedVault.keyHint ? `••••••••••••${savedVault.keyHint}` : '••••••••••••••••••••••••'}
+                          </p>
+                          <p className="mt-0.5 text-[10.5px] text-[var(--muted-foreground)]">
+                            Encrypted server-side with AES-256-GCM.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 pl-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplacingKey(true)
+                              updateCredentials({ apiKey: '' })
+                            }}
+                            className="pressable rounded-lg border border-[var(--border)] bg-[var(--card)] px-2.5 py-1 text-[11px] font-semibold text-[var(--foreground-secondary)] hover:border-[var(--brand)] hover:text-[var(--brand)]"
+                          >
+                            Replace
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleRemoveKey}
+                            disabled={isRemoving}
+                            title="Remove key from vault"
+                            className="pressable rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--error-soft)] hover:text-[var(--error)]"
+                          >
+                            {isRemoving ? (
+                              <TbLoaderQuarter className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <TbTrash className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 rounded-xl border border-[var(--warning, #b45309)]/30 px-3.5 py-2.5" style={{ background: 'rgba(180, 83, 9, 0.08)' }}>
-                      <TbAlertTriangleFilled className="h-4 w-4 shrink-0" style={{ color: '#b45309' }} />
-                      <p className="min-w-0 flex-1 text-[11px] font-medium text-[var(--foreground-secondary)]">
-                        Stored key exists but can&apos;t be decrypted with the current server key.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={handleRemoveKey}
-                        disabled={isRemoving}
-                        className="pressable shrink-0 rounded-lg px-2 py-1 text-[10.5px] font-bold text-[var(--brand)] hover:bg-[var(--brand-soft)] disabled:opacity-50"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )
-                ) : (
-                  <div className="relative">
-                    <input
-                      type={showKey ? 'text' : 'password'}
-                      placeholder={KEY_PLACEHOLDER[provider]}
-                      value={apiKey}
-                      onChange={(e) => updateCredentials({ apiKey: e.target.value })}
-                      className={`${inputCls} pr-20 font-mono-code text-xs`}
-                      spellCheck={false}
-                    />
-                    <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
-                      <button
-                        type="button"
-                        onClick={handlePasteKey}
-                        aria-label="Paste key from clipboard"
-                        title="Paste from clipboard"
-                        className="pressable rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]"
-                      >
-                        <TbClipboardText className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowKey((v) => !v)}
-                        aria-label={showKey ? 'Hide key' : 'Show key'}
-                        className="pressable rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--foreground)]"
-                      >
-                        {showKey ? <TbEyeOff className="h-4 w-4" /> : <TbEye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {savedVault?.hasKey && replacingKey && (
-                  <p className="px-1 text-[10px] font-medium text-[var(--muted-foreground)]">
-                    Saving a new key replaces the one in the vault — the old ciphertext is discarded.
-                  </p>
-                )}
-              </section>
-
-              {/* Model routing — fully dynamic */}
-              <section className="space-y-2">
-                <SectionLabel
-                  icon={<TbCpu className="h-3 w-3" />}
-                  aside={
-                    catalog.length > 0 ? (
-                      <span className="normal-case tracking-normal font-semibold text-[var(--muted-foreground)]">
-                        {catalogMeta.free} free · {catalogMeta.total} total
-                      </span>
-                    ) : undefined
-                  }
-                >
-                  Model Routing
-                </SectionLabel>
-
-                {stage !== 'connected' && (
-                  <div className="rounded-xl border border-dashed border-[var(--border-strong)] px-3 py-5 text-center">
-                    <TbCpu className="mx-auto h-5 w-5 text-[var(--muted-foreground)] opacity-60" />
-                    <p className="mt-1.5 text-[11.5px] font-medium text-[var(--muted-foreground)]">
-                      Validate your key below to load the{' '}
-                      <span className="font-bold text-[var(--foreground-secondary)]">live model catalog</span>
-                    </p>
-                  </div>
-                )}
-
-                {loadingModels && (
-                  <div className="space-y-1.5">
-                    {[0, 1, 2, 3].map((i) => (
-                      <div
-                        key={i}
-                        className="h-9 animate-pulse rounded-xl bg-[var(--brand-soft)]"
-                        style={{ animationDelay: `${i * 120}ms`, opacity: 1 - i * 0.18 }}
-                      />
-                    ))}
-                    <p className="pt-1 text-center text-[11px] font-medium text-[var(--brand)]">
-                      Fetching live models…
-                    </p>
-                  </div>
-                )}
-
-                {stage === 'connected' && !loadingModels && catalog.length > 0 && (
-                  <>
-                    {/* Search */}
                     <div className="relative">
-                      <TbSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
                       <input
-                        type="text"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        placeholder="Filter models…"
-                        className={`${inputCls} pl-9 pr-9`}
+                        type={showKey ? 'text' : 'password'}
+                        value={apiKey}
+                        onChange={(e) => updateCredentials({ apiKey: e.target.value })}
+                        placeholder={KEY_PLACEHOLDER[provider]}
+                        autoComplete="off"
                         spellCheck={false}
+                        className={`${inputCls} pr-20 font-mono-code text-xs`}
                       />
-                      {search && (
+                      <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5">
                         <button
                           type="button"
-                          onClick={() => setSearch('')}
-                          aria-label="Clear filter"
-                          className="pressable absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                          onClick={handlePasteKey}
+                          aria-label="Paste from clipboard"
+                          title="Paste from clipboard"
+                          className="pressable rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]"
                         >
-                          <TbX className="h-3.5 w-3.5" />
+                          <TbClipboardText className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowKey((v) => !v)}
+                          aria-label={showKey ? 'Hide key' : 'Show key'}
+                          className="pressable rounded-lg p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--foreground)]"
+                        >
+                          {showKey ? <TbEyeOff className="h-4 w-4" /> : <TbEye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                  {savedVault?.hasKey && replacingKey && (
+                    <p className="px-1 text-[10px] font-medium text-[var(--muted-foreground)]">
+                      Saving a new key replaces the one in the vault — the old ciphertext is discarded.
+                    </p>
+                  )}
+                </section>
+
+                {/* Model routing — fully dynamic */}
+                <section className="space-y-2">
+                  <SectionLabel
+                    icon={<TbCpu className="h-3 w-3" />}
+                    aside={
+                      catalog.length > 0 ? (
+                        <span className="normal-case tracking-normal font-semibold text-[var(--muted-foreground)]">
+                          {catalogMeta.free} free · {catalogMeta.total} total
+                        </span>
+                      ) : undefined
+                    }
+                  >
+                    Model Routing
+                  </SectionLabel>
+
+                  {stage !== 'connected' && (
+                    <div className="rounded-xl border border-dashed border-[var(--border-strong)] px-3 py-5 text-center">
+                      <TbCpu className="mx-auto h-5 w-5 text-[var(--muted-foreground)] opacity-60" />
+                      <p className="mt-1.5 text-[11.5px] font-medium text-[var(--muted-foreground)]">
+                        Validate your key below to load the{' '}
+                        <span className="font-bold text-[var(--foreground-secondary)]">live model catalog</span>
+                      </p>
+                    </div>
+                  )}
+
+                  {loadingModels && (
+                    <div className="space-y-1.5">
+                      {[0, 1, 2, 3].map((i) => (
+                        <div
+                          key={i}
+                          className="h-9 animate-pulse rounded-xl bg-[var(--brand-soft)]"
+                          style={{ animationDelay: `${i * 120}ms`, opacity: 1 - i * 0.18 }}
+                        />
+                      ))}
+                      <p className="pt-1 text-center text-[11px] font-medium text-[var(--brand)]">
+                        Fetching live models…
+                      </p>
+                    </div>
+                  )}
+
+                  {stage === 'connected' && !loadingModels && catalog.length > 0 && (
+                    <>
+                      {/* Search */}
+                      <div className="relative">
+                        <TbSearch className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--muted-foreground)]" />
+                        <input
+                          type="text"
+                          value={search}
+                          onChange={(e) => setSearch(e.target.value)}
+                          placeholder="Filter models…"
+                          className={`${inputCls} pl-9 pr-9`}
+                          spellCheck={false}
+                        />
+                        {search && (
+                          <button
+                            type="button"
+                            onClick={() => setSearch('')}
+                            aria-label="Clear filter"
+                            className="pressable absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                          >
+                            <TbX className="h-3.5 w-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Free models preview */}
+                      {freeModels.length > 0 && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between px-1">
+                            <span className="flex items-center gap-1 text-[11px] font-bold text-[var(--success)]">
+                              <TbBolt className="h-3.5 w-3.5" /> Free Models ({freeModels.length})
+                            </span>
+                            {freeModels.length > 5 && (
+                              <button
+                                type="button"
+                                onClick={() => setModelPicker('free')}
+                                className="pressable flex items-center gap-1 text-[10.5px] font-semibold text-[var(--brand)] hover:underline"
+                              >
+                                View all {freeModels.length}
+                              </button>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            {freeModels.slice(0, 5).map((m) => (
+                              <ModelRow
+                                key={m.id}
+                                entry={m}
+                                selected={model === m.id}
+                                onSelect={() => setModel(m.id)}
+                                copied={copiedModel === m.id}
+                                onCopy={() => handleCopyModel(m.id)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* All models preview */}
+                      {otherModels.length > 0 && (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between px-1">
+                            <span className="text-[11px] font-bold text-[var(--foreground-secondary)]">
+                              All Models ({otherModels.length})
+                            </span>
+                            {otherModels.length > 5 && (
+                              <button
+                                type="button"
+                                onClick={() => setModelPicker('all')}
+                                className="pressable flex items-center gap-1 text-[10.5px] font-semibold text-[var(--brand)] hover:underline"
+                              >
+                                View all {catalog.length}
+                              </button>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            {otherModels.slice(0, 5).map((m) => (
+                              <ModelRow
+                                key={m.id}
+                                entry={m}
+                                selected={model === m.id}
+                                onSelect={() => setModel(m.id)}
+                                copied={copiedModel === m.id}
+                                onCopy={() => handleCopyModel(m.id)}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {modelsError && stage === 'connected' && (
+                    <div className="flex items-center gap-2 rounded-xl border border-[var(--error)]/25 bg-[var(--error-soft)] px-3 py-2.5">
+                      <TbAlertTriangleFilled className="h-4 w-4 shrink-0 text-[var(--error)]" />
+                      <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--error)]">{modelsError}</p>
+                    </div>
+                  )}
+
+                  {model && stage === 'connected' && catalog.length > 0 && (
+                    <p className="flex items-center gap-1.5 px-1 pt-1 font-mono-code text-[10px] text-[var(--muted-foreground)]">
+                      <TbCheck className="h-3 w-3 shrink-0 text-[var(--success)]" />
+                      routing tasks via <span className="truncate font-semibold text-[var(--foreground-secondary)]">{model}</span>
+                    </p>
+                  )}
+                </section>
+              </div>
+            ) : (
+              /* Deploy Webhooks Panel */
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+                {/* Outbound Webhook Section */}
+                <section className="space-y-3">
+                  <SectionLabel icon={<TbRocket className="h-3 w-3" />}>
+                    Outbound Deploy Trigger (Per-Repo)
+                  </SectionLabel>
+
+                  <p className="text-[11.5px] text-[var(--muted-foreground)] leading-relaxed">
+                    WayCode sends an HTTP POST immediately after you review and approve changes on a task branch.
+                  </p>
+
+                  {repositories.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-[var(--border-strong)] p-4 text-center">
+                      <TbBrandGithub className="mx-auto h-6 w-6 text-[var(--muted-foreground)] opacity-60" />
+                      <p className="mt-2 text-xs font-semibold text-[var(--foreground)]">No repositories connected</p>
+                      <p className="mt-0.5 text-[11px] text-[var(--muted-foreground)]">
+                        Sync your GitHub repositories to configure custom deploy hooks.
+                      </p>
+                      {syncRepos && (
+                        <button
+                          type="button"
+                          onClick={() => syncRepos()}
+                          disabled={isSyncing}
+                          className="btn-brand pressable mt-3 inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold"
+                        >
+                          <TbRefresh className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+                          {isSyncing ? 'Syncing…' : 'Sync GitHub Repos'}
                         </button>
                       )}
                     </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
+                          Select Repository
+                        </label>
+                        <select
+                          value={activeDeployRepoId}
+                          onChange={(e) => handleSelectDeployRepo(e.target.value)}
+                          className={inputCls}
+                        >
+                          {repositories.map((r) => {
+                            const isConfigured = Boolean(repoHooks[r.id] || r.deploy_webhook_url)
+                            return (
+                              <option key={r.id} value={r.id}>
+                                {r.repo_name} {isConfigured ? '✓ (configured)' : ''}
+                              </option>
+                            )
+                          })}
+                        </select>
+                      </div>
 
-                    {freeModels.length > 0 && (
-                      <div className="space-y-1.5 pt-1">
-                        <p className="flex items-center gap-1.5 text-[10px] font-bold text-[var(--success)]">
-                          <TbBolt className="h-3 w-3" /> FREE MODELS FIRST
+                      <div>
+                        <label className="mb-1.5 block text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
+                          Webhook Target URL
+                        </label>
+                        <input
+                          type="url"
+                          value={deployHookUrl}
+                          onChange={(e) => setDeployHookUrl(e.target.value)}
+                          placeholder="https://dokku.example.com/app/deploy"
+                          className={`${inputCls} font-mono-code text-xs`}
+                          spellCheck={false}
+                        />
+                        <p className="mt-1.5 text-[10.5px] text-[var(--muted-foreground)]">
+                          Supports Dokku, Coolify, AWS CodePipeline, Render, or any custom webhook receiver.
                         </p>
-                        {freeModels.slice(0, 8).map((m) => (
-                          <ModelRow
-                            key={m.id}
-                            entry={m}
-                            selected={model === m.id}
-                            onSelect={() => setModel(m.id)}
-                            copied={copiedModel === m.id}
-                            onCopy={() => handleCopyModel(m.id)}
-                          />
-                        ))}
-                        {freeModels.length > 8 && (
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleSaveHook}
+                          disabled={isSavingHook || !activeDeployRepoId}
+                          className="btn-brand pressable flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold"
+                        >
+                          {isSavingHook ? (
+                            <TbLoaderQuarter className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <TbCheck className="h-3.5 w-3.5" />
+                          )}
+                          Save Hook
+                        </button>
+                        {repoHooks[activeDeployRepoId] && (
                           <button
                             type="button"
-                            onClick={() => setModelPicker('free')}
-                            className="pressable flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--brand)]/35 py-2 text-[11px] font-bold text-[var(--brand)] transition-colors hover:bg-[var(--brand-soft)]"
+                            onClick={handleDeleteHook}
+                            disabled={isDeletingHook}
+                            className="pressable flex items-center justify-center gap-1.5 rounded-xl border border-[var(--error)]/30 bg-[var(--error-soft)] px-3 py-2 text-xs font-semibold text-[var(--error)] hover:bg-[var(--error-soft)]/80"
                           >
-                            <TbListDetails className="h-3.5 w-3.5" />
-                            See all {freeModels.length} free models
+                            {isDeletingHook ? (
+                              <TbLoaderQuarter className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <TbTrash className="h-3.5 w-3.5" />
+                            )}
+                            Remove
                           </button>
                         )}
                       </div>
-                    )}
 
-                    {otherModels.length > 0 && (
-                      <div className="space-y-1.5 pt-2">
-                        <p className="text-[10px] font-bold text-[var(--muted-foreground)]">
-                          ALL MODELS{freeModels.length > 0 && search ? '' : ' · PAID / STANDARD'}
-                        </p>
-                        {otherModels.slice(0, 40).map((m) => (
-                          <ModelRow
-                            key={m.id}
-                            entry={m}
-                            selected={model === m.id}
-                            onSelect={() => setModel(m.id)}
-                            copied={copiedModel === m.id}
-                            onCopy={() => handleCopyModel(m.id)}
-                          />
-                        ))}
-                        {otherModels.length > 40 && (
-                          <button
-                            type="button"
-                            onClick={() => setModelPicker('all')}
-                            className="pressable flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-[var(--border-strong)] py-2 text-[11px] font-bold text-[var(--foreground-secondary)] transition-colors hover:bg-[var(--card-hover)]"
-                          >
-                            <TbListDetails className="h-3.5 w-3.5" />
-                            See all {otherModels.length} models
-                          </button>
+                      {/* Payload Schema Preview */}
+                      <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                        <button
+                          type="button"
+                          onClick={() => setShowPayloadSchema((v) => !v)}
+                          className="flex w-full items-center justify-between text-left text-[11px] font-bold text-[var(--foreground-secondary)]"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <TbTerminal2 className="h-3.5 w-3.5 text-[var(--brand)]" />
+                            Outbound Payload Schema
+                          </span>
+                          <span className="text-[10px] text-[var(--muted-foreground)]">
+                            {showPayloadSchema ? 'Hide' : 'View JSON'}
+                          </span>
+                        </button>
+
+                        {showPayloadSchema && (
+                          <pre className="mt-2.5 overflow-x-auto rounded-lg bg-[var(--card)] p-2.5 font-mono-code text-[10px] text-[var(--muted-foreground)]">
+{JSON.stringify(
+  {
+    event: 'waycode.task.shipped',
+    taskId: 'c9b4e28f-...',
+    repo: repositories.find((r) => r.id === activeDeployRepoId)?.repo_name || 'owner/repo',
+    branch: 'waycode/add-auth-flow',
+    prompt: 'Implement auth with session checks',
+    pullRequestUrl: 'https://github.com/owner/repo/pull/12',
+    timestamp: new Date().toISOString(),
+  },
+  null,
+  2
+)}
+                          </pre>
                         )}
                       </div>
-                    )}
+                    </div>
+                  )}
+                </section>
 
-                    {freeModels.length === 0 && otherModels.length === 0 && (
-                      <p className="anim-fade-in rounded-xl border border-dashed border-[var(--border-strong)] px-3 py-4 text-center text-[11px] text-[var(--muted-foreground)]">
-                        No models match “{search.trim()}”.
-                      </p>
-                    )}
-                  </>
-                )}
+                <hr className="border-[var(--border)]" />
 
-                {modelsError && stage === 'connected' && (
-                  <div className="flex items-center gap-2 rounded-xl border border-[var(--error)]/25 bg-[var(--error-soft)] px-3 py-2.5">
-                    <TbAlertTriangleFilled className="h-4 w-4 shrink-0 text-[var(--error)]" />
-                    <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--error)]">{modelsError}</p>
-                  </div>
-                )}
+                {/* Inbound Webhook Section */}
+                <section className="space-y-3">
+                  <SectionLabel icon={<TbPlugConnected className="h-3 w-3" />}>
+                    Inbound Webhook (Build Status)
+                  </SectionLabel>
 
-                {model && stage === 'connected' && catalog.length > 0 && (
-                  <p className="flex items-center gap-1.5 px-1 pt-1 font-mono-code text-[10px] text-[var(--muted-foreground)]">
-                    <TbCheck className="h-3 w-3 shrink-0 text-[var(--success)]" />
-                    routing tasks via <span className="truncate font-semibold text-[var(--foreground-secondary)]">{model}</span>
+                  <p className="text-[11.5px] text-[var(--muted-foreground)] leading-relaxed">
+                    When your CI/CD or VPS finishes deploying, POST to WayCode to receive live URL confirmations via WhatsApp and Web Push.
                   </p>
-                )}
-              </section>
-            </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
+                      Webhook URL
+                    </label>
+                    <div className="flex items-center gap-1.5 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] p-1.5 pl-3">
+                      <code className="min-w-0 flex-1 truncate font-mono-code text-[11px] text-[var(--foreground)]">
+                        {typeof window !== 'undefined' ? `${window.location.origin}/api/webhooks/deploy` : '/api/webhooks/deploy'}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const url = `${window.location.origin}/api/webhooks/deploy`
+                          await navigator.clipboard.writeText(url)
+                          setCopiedInbound(true)
+                          setTimeout(() => setCopiedInbound(false), 1600)
+                        }}
+                        className="pressable flex items-center gap-1 rounded-lg bg-[var(--card)] px-2.5 py-1 text-[11px] font-semibold text-[var(--foreground-secondary)] shadow-sm hover:text-[var(--brand)]"
+                      >
+                        {copiedInbound ? <TbCheck className="h-3.5 w-3.5 text-[var(--success)]" /> : <TbCopy className="h-3.5 w-3.5" />}
+                        {copiedInbound ? 'Copied' : 'Copy'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Snippets */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--muted-foreground)]">
+                        Example Integration
+                      </span>
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setInboundSnippetTab('curl')}
+                          className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
+                            inboundSnippetTab === 'curl'
+                              ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
+                              : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                          }`}
+                        >
+                          cURL
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setInboundSnippetTab('github')}
+                          className={`rounded-md px-2 py-0.5 text-[10px] font-semibold ${
+                            inboundSnippetTab === 'github'
+                              ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
+                              : 'text-[var(--muted-foreground)] hover:text-[var(--foreground)]'
+                          }`}
+                        >
+                          GitHub Actions
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const snippet =
+                            inboundSnippetTab === 'curl'
+                              ? `curl -X POST "${window.location.origin}/api/webhooks/deploy" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "branch": "waycode/feature-name",\n    "status": "success",\n    "url": "https://my-app.example.com",\n    "source": "Dokku"\n  }'`
+                              : `- name: Notify WayCode\n  if: always()\n  run: |\n    curl -X POST "${window.location.origin}/api/webhooks/deploy" \\\n      -H "Content-Type: application/json" \\\n      -d '{\n        "branch": "\${{ github.head_ref || github.ref_name }}",\n        "status": "\${{ job.status }}",\n        "url": "https://preview.example.com",\n        "source": "GitHub Actions"\n      }'`
+                          await navigator.clipboard.writeText(snippet)
+                          setCopiedSnippet(inboundSnippetTab)
+                          setTimeout(() => setCopiedSnippet(null), 1600)
+                        }}
+                        className="absolute right-2.5 top-2.5 pressable rounded-md bg-[var(--card)] p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                        title="Copy snippet"
+                      >
+                        {copiedSnippet === inboundSnippetTab ? (
+                          <TbCheck className="h-3.5 w-3.5 text-[var(--success)]" />
+                        ) : (
+                          <TbCopy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+
+                      <pre className="overflow-x-auto font-mono-code text-[10px] text-[var(--foreground-secondary)] pr-6 leading-relaxed">
+                        {inboundSnippetTab === 'curl' ? (
+                          `curl -X POST "${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhooks/deploy" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "branch": "waycode/feature-name",
+    "status": "success",
+    "url": "https://my-app.example.com",
+    "source": "Dokku"
+  }'`
+                        ) : (
+                          `- name: Notify WayCode
+  if: always()
+  run: |
+    curl -X POST "${typeof window !== 'undefined' ? window.location.origin : ''}/api/webhooks/deploy" \\
+      -H "Content-Type: application/json" \\
+      -d '{
+        "branch": "\${{ github.head_ref || github.ref_name }}",
+        "status": "\${{ job.status }}",
+        "url": "https://preview.example.com",
+        "source": "GitHub Actions"
+      }'`
+                        )}
+                      </pre>
+                    </div>
+                  </div>
+                </section>
+              </div>
+            )}
 
             {/* Footer actions */}
-            <div className="flex gap-2.5 border-t border-[var(--border)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              <button
-                onClick={handleValidate}
-                disabled={!canValidate}
-                title={!apiKey.trim() ? 'Paste your API key first' : undefined}
-                className="pressable flex flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] py-2.5 text-xs font-semibold text-[var(--foreground)] hover:border-[var(--brand)] disabled:opacity-50"
-              >
-                {stage === 'validating' ? (
-                  <TbLoaderQuarter className="h-4 w-4 animate-spin text-[var(--brand)]" />
-                ) : (
-                  <TbActivity className="h-4 w-4 text-[var(--brand)]" />
-                )}
-                {stage === 'connected' ? 'Re-validate' : 'Validate Key'}
-              </button>
+            {activeTab === 'vault' ? (
+              <div className="flex gap-2.5 border-t border-[var(--border)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                <button
+                  onClick={handleValidate}
+                  disabled={!canValidate}
+                  title={!apiKey.trim() ? 'Paste your API key first' : undefined}
+                  className="pressable flex flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] py-2.5 text-xs font-semibold text-[var(--foreground)] hover:border-[var(--brand)] disabled:opacity-50"
+                >
+                  {stage === 'validating' ? (
+                    <TbLoaderQuarter className="h-4 w-4 animate-spin text-[var(--brand)]" />
+                  ) : (
+                    <TbActivity className="h-4 w-4 text-[var(--brand)]" />
+                  )}
+                  {stage === 'connected' ? 'Re-validate' : 'Validate Key'}
+                </button>
 
-              <button
-                onClick={handleSave}
-                disabled={!canSave}
-                title={!canSave ? (stage !== 'connected' ? 'Validate the key first' : 'Pick a model') : undefined}
-                className="btn-brand pressable flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold"
-              >
-                {isSaving ? (
-                  <TbLoaderQuarter className="h-4 w-4 animate-spin" />
-                ) : (
-                  <TbShieldLock className="h-4 w-4" />
-                )}
-                Save Vault
-              </button>
-            </div>
+                <button
+                  onClick={handleSave}
+                  disabled={!canSave}
+                  title={!canSave ? (stage !== 'connected' ? 'Validate the key first' : 'Pick a model') : undefined}
+                  className="btn-brand pressable flex flex-1 items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold"
+                >
+                  {isSaving ? (
+                    <TbLoaderQuarter className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <TbShieldLock className="h-4 w-4" />
+                  )}
+                  Save Vault
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between border-t border-[var(--border)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+                <span className="text-[11px] text-[var(--muted-foreground)]">
+                  {repoHooks[selectedDeployRepoId] ? 'Hook active for selected repo' : 'No hook configured'}
+                </span>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="pressable rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-xs font-semibold text-[var(--foreground)] hover:bg-[var(--card-hover)]"
+                >
+                  Done
+                </button>
+              </div>
+            )}
           </motion.div>
         </div>
       )}

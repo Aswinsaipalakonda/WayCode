@@ -8,6 +8,7 @@ interface Repository {
   id: string
   repo_name: string
   default_branch: string
+  deploy_webhook_url?: string | null
 }
 
 interface RepoPickerProps {

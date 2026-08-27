@@ -10,6 +10,7 @@ import {
   landApprovedDiff,
 } from '@/lib/git-agent'
 import { sendPushToUser } from '@/lib/push'
+import { triggerDeployHook } from '@/lib/deploy-trigger'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -51,18 +52,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Task has no diff to land' }, { status: 409 })
     }
 
-    // Resolve repo name + default branch.
+    // Resolve repo name + default branch + optional deploy hook.
     let repoName = ''
     let defaultBranch = 'main'
+    let deployWebhookUrl: string | null = null
     if (job.repo_id) {
       const { data: repo } = await supabase
         .from('repositories')
-        .select('repo_name, default_branch')
+        .select('repo_name, default_branch, deploy_webhook_url')
         .eq('id', job.repo_id)
         .single()
       if (repo) {
         repoName = repo.repo_name
         defaultBranch = repo.default_branch || 'main'
+        deployWebhookUrl = repo.deploy_webhook_url || null
       }
     }
     if (!repoName) {
@@ -150,6 +153,38 @@ export async function POST(request: Request) {
         ? `[SHIPPED] Pushed ${pushedBranch} and opened pull request #${pr.number}: ${pr.url}`
         : `[SHIPPED] Pushed branch ${pushedBranch} to GitHub.`,
     })
+
+    // Outbound deploy trigger (Dokku / Coolify / CodePipeline / custom)
+    if (deployWebhookUrl) {
+      void (async () => {
+        try {
+          const triggerRes = await triggerDeployHook({
+            webhookUrl: deployWebhookUrl,
+            repoName,
+            branchName: pushedBranch,
+            taskId,
+            prompt: job.prompt,
+            prUrl: pr?.url ?? null,
+          })
+
+          if (triggerRes.success) {
+            await supabase.from('task_logs').insert({
+              task_id: taskId,
+              log_level: 'info',
+              message: `[DEPLOY HOOK] Dispatched outbound deploy webhook for ${repoName}.`,
+            })
+          } else {
+            await supabase.from('task_logs').insert({
+              task_id: taskId,
+              log_level: 'error',
+              message: `[DEPLOY HOOK FAILED] Outbound trigger error: ${triggerRes.error || 'Failed to dispatch'}`,
+            })
+          }
+        } catch (hookErr: unknown) {
+          console.error('[Deploy Hook Trigger] Error:', hookErr)
+        }
+      })()
+    }
 
     // "Shipped" push — closes the loop for users who left after approving.
     void sendPushToUser(admin, user.id, {
