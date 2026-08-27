@@ -33,7 +33,6 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
   }, [initialNumber])
 
   const handleStartEdit = () => {
-    // Extract last 10 digits if existing
     if (number) {
       const clean = number.replace(/\D/g, '')
       setDigits(clean.slice(-10))
@@ -117,7 +116,7 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
     return (
       <div className="flex items-center justify-between gap-3 rounded-[22px] border border-black/[0.05] bg-white/90 p-4 shadow-[var(--shadow-sm)]">
         <span className="flex items-center gap-2.5 text-[13px] font-semibold text-[var(--muted-foreground)]">
-          <TbLoaderQuarter className="h-4 w-4 animate-spin text-[var(--brand)]" />
+          <TbLoaderQuarter className="h-4 w-4 animate-spin text-[#25D366]" />
           Loading WhatsApp settings…
         </span>
       </div>
@@ -150,7 +149,7 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
                 <button
                   type="button"
                   onClick={handleStartEdit}
-                  className="pressable inline-flex items-center gap-1 rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-bold text-[#111827] shadow-sm hover:border-black/20"
+                  className="pressable inline-flex items-center gap-1 rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-bold text-[#111827] shadow-xs hover:border-black/20"
                 >
                   <TbEdit className="h-3.5 w-3.5" />
                   Edit
@@ -169,7 +168,7 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
               <button
                 type="button"
                 onClick={handleStartEdit}
-                className="btn-brand pressable rounded-full px-3.5 py-1.5 text-[11px] font-bold shadow-sm"
+                className="pressable rounded-full bg-[#25D366] text-white px-3.5 py-1.5 text-[11px] font-bold shadow-xs hover:bg-[#20bd5a]"
               >
                 Connect
               </button>
@@ -193,8 +192,8 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="flex flex-1 items-center rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 transition-all focus-within:border-[var(--brand)] focus-within:ring-2 focus-within:ring-[var(--brand-soft)]">
-              <div className="flex items-center gap-1 border-r border-black/10 pr-2 mr-2 text-xs font-bold text-[#111827]">
+            <div className="flex h-11 flex-1 items-center rounded-xl border border-[#cbd5e1] bg-white px-2.5 transition-all focus-within:border-[#25D366] focus-within:ring-4 focus-within:ring-[#25D366]/15">
+              <div className="flex h-7 shrink-0 items-center gap-1 rounded-lg bg-[#f1f5f9] px-2 text-xs font-bold text-[#0f172a] select-none">
                 <span>🇮🇳</span>
                 <span>+91</span>
               </div>
@@ -206,7 +205,7 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
                 onChange={(e) => handleDigitsChange(e.target.value)}
                 placeholder="98765 43210"
                 maxLength={11}
-                className="w-full bg-transparent font-mono-code text-[13px] font-medium text-[#111827] placeholder:text-[var(--muted-foreground)]/60 outline-none"
+                className="h-full min-w-0 flex-1 border-0 bg-transparent px-2.5 font-mono-code text-[14px] font-semibold text-[#0f172a] placeholder:font-normal placeholder:text-[#94a3b8]/70 focus:border-0 focus:outline-none focus:ring-0 outline-none ring-0"
                 autoFocus
               />
             </div>
@@ -216,7 +215,7 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
                 type="button"
                 onClick={handleSave}
                 disabled={loading || digits.length !== 10}
-                className="btn-brand pressable inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
+                className="pressable inline-flex h-11 items-center gap-1.5 rounded-xl bg-[#25D366] px-4 text-xs font-bold text-white shadow-xs hover:bg-[#20bd5a] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <TbLoaderQuarter className="h-3.5 w-3.5 animate-spin" />
@@ -229,7 +228,7 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
                 type="button"
                 onClick={handleCancel}
                 disabled={loading}
-                className="pressable rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[var(--muted-foreground)] hover:bg-black/5 hover:text-[#111827]"
+                className="pressable flex h-11 items-center rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-[var(--muted-foreground)] hover:bg-black/5 hover:text-[#111827]"
               >
                 Cancel
               </button>
