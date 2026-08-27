@@ -9,6 +9,12 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://cczeusftmsaykelqyfgu.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjemV1c2Z0bXNheWtlbHF5Zmd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcwMzU5OTYsImV4cCI6MjEwMjYxMTk5Nn0.1ky7ZfW3EqvbbRd3pKbRzMC_tyHDHzDiWyL9O29zUrA
+      SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjemV1c2Z0bXNheWtlbHF5Zmd1Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NzAzNTk5NiwiZXhwIjoyMTAyNjExOTk2fQ.W9ywEUR2F7xM5WpHB1coQJZWp5mmlwzPEwL8KsrMXCA
+      SETTINGS_ENCRYPTION_KEY: 27f59d2cd68b503c326055ae4507473d17792733f76bba56f739c792ce6be7a2
+      REDIS_URL: redis://127.0.0.1:6379
     steps:
       - uses: actions/checkout@v4
 
