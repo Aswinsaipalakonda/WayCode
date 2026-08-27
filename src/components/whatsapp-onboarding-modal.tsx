@@ -12,10 +12,24 @@ interface WhatsAppOnboardingModalProps {
   } | null
 }
 
+export function openWhatsAppModal() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('waycode:open-whatsapp-modal'))
+  }
+}
+
 export function WhatsAppOnboardingModal({ user }: WhatsAppOnboardingModalProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [digits, setDigits] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const handleOpen = () => setIsOpen(true)
+    window.addEventListener('waycode:open-whatsapp-modal', handleOpen)
+    return () => {
+      window.removeEventListener('waycode:open-whatsapp-modal', handleOpen)
+    }
+  }, [])
 
   useEffect(() => {
     if (!user || !user.id || typeof window === 'undefined') return

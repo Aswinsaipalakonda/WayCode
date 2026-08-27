@@ -93,6 +93,23 @@ export async function POST(request: Request) {
       )
     }
 
+    // Enforce WhatsApp deployment alert configuration (PRD §5.7, §7.7)
+    const { data: userSettings } = await supabase
+      .from('user_settings')
+      .select('whatsapp_number')
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (!userSettings?.whatsapp_number?.trim()) {
+      return NextResponse.json(
+        {
+          error: 'Please connect your WhatsApp number to receive deployment alerts before starting tasks.',
+          requiresWhatsApp: true,
+        },
+        { status: 428 },
+      )
+    }
+
     // Normalize + validate optional context attachments (PRD §7.3).
     let taskContext: TaskContext | null = null
     if (context && typeof context === 'object') {

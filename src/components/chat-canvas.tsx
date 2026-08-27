@@ -23,6 +23,7 @@ import {
 import { TelemetryStreamer } from '@/components/telemetry-streamer'
 import { DiffReviewModal } from '@/components/diff-review-modal'
 import { useAppChrome } from '@/components/app-chrome'
+import { openWhatsAppModal } from '@/components/whatsapp-onboarding-modal'
 
 interface ThreadMessage {
   id: string
@@ -287,9 +288,16 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
         }
       } else {
         setMessages((prev) => prev.filter((m) => m.id !== userMessageId))
-        toast.error(data.error || 'Could not queue this task', {
-          description: 'Give it another moment and try again.',
-        })
+        if (res.status === 428 || data.requiresWhatsApp) {
+          openWhatsAppModal()
+          toast.info('WhatsApp number required', {
+            description: 'Connect your WhatsApp number to receive deployment alerts before starting tasks.',
+          })
+        } else {
+          toast.error(data.error || 'Could not queue this task', {
+            description: 'Give it another moment and try again.',
+          })
+        }
         setPrompt(text)
       }
     } catch {
