@@ -11,6 +11,7 @@ import {
 } from '@/lib/git-agent'
 import { sendPushToUser } from '@/lib/push'
 import { triggerDeployHook } from '@/lib/deploy-trigger'
+import { recordDeployEvent } from '@/lib/deploy-notify'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
@@ -195,6 +196,34 @@ export async function POST(request: Request) {
       url: '/tasks',
       tag: taskId,
     })
+
+    // Out-of-band WhatsApp alert matching workflow.png topology layout
+    const filesChanged = typeof job.diff_content === 'string'
+      ? (job.diff_content.match(/^diff --git/gm) || []).length || 1
+      : 1
+    const buildTimeSeconds = job.created_at
+      ? Math.max(1, Math.round((Date.now() - new Date(job.created_at).getTime()) / 1000))
+      : 35
+
+    void recordDeployEvent(
+      admin,
+      {
+        id: taskId,
+        user_id: user.id,
+        prompt: job.prompt,
+        repo_name: repoName,
+        branch_name: pushedBranch,
+        commit_hash: pushedBranch.replace('waycode/task-', '').slice(0, 7),
+        files_changed: filesChanged,
+        build_time_seconds: buildTimeSeconds,
+        pr_url: pr?.url ?? null,
+      },
+      {
+        success: true,
+        source: 'GitHub',
+        url: pr?.url ?? null,
+      },
+    )
 
     return NextResponse.json({
       success: true,

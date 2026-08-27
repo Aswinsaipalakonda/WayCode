@@ -61,3 +61,40 @@ describe('WhatsApp Notification Helper', () => {
     expect(success).toBe(false)
   })
 })
+
+describe('formatWhatsAppDeployMessage', () => {
+  it('formats deployment success matching workflow.png topology specifications', async () => {
+    const { formatWhatsAppDeployMessage } = await import('../src/lib/deploy-notify')
+    const message = formatWhatsAppDeployMessage(
+      {
+        id: 'task-123',
+        user_id: 'user-456',
+        prompt: 'Add a modern hero section with animated gradient background',
+        repo_name: 'aswinpalakonda/portfolio-nextjs',
+        branch_name: 'waycode/task-a1b2c3d',
+        commit_hash: 'a1b2c3d',
+        files_changed: 12,
+        build_time_seconds: 35,
+        pr_url: 'https://github.com/aswinpalakonda/portfolio-nextjs/pull/4',
+      },
+      {
+        success: true,
+        source: 'GitHub',
+        url: 'https://github.com/aswinpalakonda/portfolio-nextjs/pull/4',
+      },
+    )
+
+    expect(message).toContain('🚀 *Deployment Successful*')
+    expect(message).toContain('📝 *Task:*')
+    expect(message).toContain('Add a modern hero section')
+    expect(message).toContain('📦 *Repository:*')
+    expect(message).toContain('aswinpalakonda/portfolio-nextjs')
+    expect(message).toContain('🔖 *Commit:* a1b2c3d')
+    expect(message).toContain('📁 *Files Changed:* 12')
+    expect(message).toContain('⏱️ *Build Status:* Success')
+    expect(message).toContain('*Build Time:* 35s')
+    expect(message).toContain('🔗 *Pull Request / Merge URL:*')
+    expect(message).toContain('https://github.com/aswinpalakonda/portfolio-nextjs/pull/4')
+    expect(message).toContain('Great work! 🚀')
+  })
+})
