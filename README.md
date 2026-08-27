@@ -44,38 +44,9 @@ The developer expresses **intent** (*"Add a Supabase auth hook to the checkout p
 
 ## 🛠️ Architecture & System Topology
 
-```
-+------------------+        HTTPS/WSS        +---------------------------+
-|   Mobile Client   |  <-------------------->  |     Next.js App Router    |
-| (PWA, Next.js)    |                          |  (Client-facing API +     |
-|  Tailwind, Shadcn |                          |   Auth Middleware)        |
-+---------+---------+                          +-------------+-------------+
-          |                                                   |
-          | Supabase Realtime (CDC)                           | Enqueue Job
-          v                                                   v
-+---------------------------+                        +-----------------+
-|   Supabase (BaaS Layer)   |  <-------------------->  |  Redis Queue    |
-|  - Auth (GitHub OAuth)     |     Status Writes       | (Dockerized,    |
-|  - PostgreSQL (jobs, logs) |                          |  redis:alpine)  |
-|  - Realtime CDC Broadcast  |                          +--------+--------+
-+---------------------------+                                    |
-                                                                   | Consume
-                                                                   v
-                                                    +---------------------------+
-                                                    |   Agent Daemon (VPS)       |
-                                                    |  Node.js/Python + PM2      |
-                                                    |  Antigravity ACI Harness   |
-                                                    |  (tool calls + self-heal)  |
-                                                    |  Git CLI + Sandbox FS      |
-                                                    +-------------+-------------+
-                                                                   |
-                                                                   | BYOK request
-                                                                   v
-                                                    +---------------------------+
-                                                    |  AI Provider (OpenRouter / |
-                                                    |  Gemini / Custom OpenAI)  |
-                                                    +---------------------------+
-```
+<div align="center">
+  <img src="workflow.png" alt="WayCode Architecture & System Topology" style="max-width: 100%; height: auto; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.12);" />
+</div>
 
 ---
 
