@@ -9,6 +9,7 @@ import { Sidebar } from '@/components/sidebar'
 import { BottomNav } from '@/components/bottom-nav'
 import { SettingsDrawer } from '@/components/settings-drawer'
 import { RepoPicker } from '@/components/repo-picker'
+import { WhatsAppOnboardingModal } from '@/components/whatsapp-onboarding-modal'
 import {
   getServerRepoId,
   getStoredRepoId,
@@ -193,6 +194,7 @@ export function AppChrome({ user, initialRepositories, bodyClassName, children }
 
         <BottomNav />
         <SettingsDrawer isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <WhatsAppOnboardingModal user={user} />
 
         {/* Shared repository picker — reachable from any screen */}
         <RepoPicker

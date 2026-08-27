@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { AppChrome } from '@/components/app-chrome'
 import { NotificationToggle } from '@/components/notification-toggle'
+import { WhatsAppSettings } from '@/components/whatsapp-settings'
 import { redirect } from 'next/navigation'
 import Image from 'next/image'
 import { Mail, GitBranch, LogOut, AtSign, BadgeCheck } from 'lucide-react'
@@ -16,10 +17,17 @@ export default async function ProfilePage() {
     return redirect('/')
   }
 
-  const { data: repositories } = await supabase
-    .from('repositories')
-    .select('*')
-    .order('created_at', { ascending: false })
+  const [{ data: repositories }, { data: settings }] = await Promise.all([
+    supabase
+      .from('repositories')
+      .select('*')
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('user_settings')
+      .select('whatsapp_number')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+  ])
 
   const rowCls =
     'flex items-center justify-between gap-3 rounded-[22px] border border-black/[0.05] bg-white/90 p-4 shadow-[var(--shadow-sm)] transition-all duration-300 hover:border-black/[0.09] hover:bg-white'
@@ -124,6 +132,7 @@ export default async function ProfilePage() {
               Notifications
             </p>
             <NotificationToggle />
+            <WhatsAppSettings initialNumber={settings?.whatsapp_number || null} />
           </div>
 
           {/* Sign out */}

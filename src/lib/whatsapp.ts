@@ -1,11 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-const WHATSAPP_TOKEN = process.env.WHATSAPP_TOKEN || ''
-const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || ''
 const GRAPH_VERSION = 'v21.0'
 
+export function getWhatsAppConfig() {
+  const token = process.env.WHATSAPP_TOKEN || ''
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || ''
+  return { token, phoneId }
+}
+
 export function whatsappConfigured(): boolean {
-  return !!(WHATSAPP_TOKEN && WHATSAPP_PHONE_NUMBER_ID)
+  const { token, phoneId } = getWhatsAppConfig()
+  return !!(token && phoneId)
 }
 
 /** Fetch the user's registered WhatsApp number, if any. */
@@ -31,18 +36,19 @@ export async function getWhatsAppNumber(
  * (PRD §7.7). Never throws — notification failures must not fail webhooks.
  */
 export async function sendWhatsAppText(to: string, body: string): Promise<boolean> {
-  if (!whatsappConfigured()) {
+  const { token, phoneId } = getWhatsAppConfig()
+  if (!token || !phoneId) {
     console.warn('[WhatsApp] Skipped — WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID not configured.')
     return false
   }
 
   try {
     const res = await fetch(
-      `https://graph.facebook.com/${GRAPH_VERSION}/${WHATSAPP_PHONE_NUMBER_ID}/messages`,
+      `https://graph.facebook.com/${GRAPH_VERSION}/${phoneId}/messages`,
       {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${WHATSAPP_TOKEN}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
