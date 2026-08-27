@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 
 export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | null }) {
   const [number, setNumber] = useState<string | null>(initialNumber ?? null)
-  const [inputVal, setInputVal] = useState<string>('')
+  const [digits, setDigits] = useState<string>('')
   const [isEditing, setIsEditing] = useState(false)
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(initialNumber === undefined)
@@ -33,28 +33,42 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
   }, [initialNumber])
 
   const handleStartEdit = () => {
-    setInputVal(number || '')
+    // Extract last 10 digits if existing
+    if (number) {
+      const clean = number.replace(/\D/g, '')
+      setDigits(clean.slice(-10))
+    } else {
+      setDigits('')
+    }
     setIsEditing(true)
   }
 
   const handleCancel = () => {
     setIsEditing(false)
-    setInputVal('')
+    setDigits('')
   }
 
+  const handleDigitsChange = (val: string) => {
+    const cleaned = val.replace(/\D/g, '').slice(0, 10)
+    setDigits(cleaned)
+  }
+
+  const formattedDisplay = digits.length > 5 ? `${digits.slice(0, 5)} ${digits.slice(5)}` : digits
+
   const handleSave = async () => {
-    const raw = inputVal.trim()
-    if (!raw) {
-      toast.warning('Please enter a valid phone number')
+    if (digits.length !== 10) {
+      toast.warning('Please enter a valid 10-digit mobile number')
       return
     }
 
+    const fullNumber = `+91${digits}`
     setLoading(true)
+
     try {
       const res = await fetch('/api/settings/whatsapp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ whatsappNumber: raw }),
+        body: JSON.stringify({ whatsappNumber: fullNumber }),
       })
       const data = await res.json()
 
@@ -62,11 +76,11 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
         setNumber(data.whatsappNumber)
         setIsEditing(false)
         toast.success('WhatsApp number saved', {
-          description: 'You will now receive out-of-band deployment receipts on WhatsApp.',
+          description: `Connected to +91 ${formattedDisplay}`,
         })
       } else {
         toast.error('Failed to save WhatsApp number', {
-          description: data.error || 'Please check the phone number format.',
+          description: data.error || 'Please check your phone number.',
         })
       }
     } catch {
@@ -87,8 +101,8 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
       if (res.ok && data.success) {
         setNumber(null)
         setIsEditing(false)
-        setInputVal('')
-        toast.success('WhatsApp number removed')
+        setDigits('')
+        toast.success('WhatsApp notifications removed')
       } else {
         toast.error('Failed to remove WhatsApp number')
       }
@@ -115,16 +129,16 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
       {!isEditing ? (
         <div className="flex items-center justify-between gap-3">
           <span className="flex items-center gap-2.5 text-[13px] font-semibold">
-            <span className="rounded-xl bg-[#25D366]/15 p-2 text-[#25D366]">
+            <span className="rounded-xl bg-[#25D366]/10 p-2 text-[#128C7E]">
               <TbBrandWhatsapp className="h-4 w-4" />
             </span>
             <span className="min-w-0">
               WhatsApp alerts
-              <span className="block text-[10px] font-medium text-[var(--muted-foreground)]">
+              <span className="block text-[10.5px] font-medium text-[var(--muted-foreground)]">
                 {number ? (
-                  <span className="font-mono-code font-semibold text-[var(--foreground)]">{number}</span>
+                  <span className="font-mono-code font-semibold text-[#111827]">{number}</span>
                 ) : (
-                  'Deploy receipts & live URLs'
+                  'Deploy receipts & preview URLs'
                 )}
               </span>
             </span>
@@ -136,7 +150,7 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
                 <button
                   type="button"
                   onClick={handleStartEdit}
-                  className="pressable inline-flex items-center gap-1 rounded-full border border-[var(--border-strong)] bg-white px-3 py-1.5 text-[11px] font-bold text-[var(--foreground-secondary)] shadow-sm hover:border-[var(--brand)] hover:text-[var(--brand)]"
+                  className="pressable inline-flex items-center gap-1 rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-bold text-[#111827] shadow-sm hover:border-black/20"
                 >
                   <TbEdit className="h-3.5 w-3.5" />
                   Edit
@@ -155,9 +169,9 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
               <button
                 type="button"
                 onClick={handleStartEdit}
-                className="btn-brand pressable rounded-full px-3 py-1.5 text-[11px] font-bold shadow-sm"
+                className="btn-brand pressable rounded-full px-3.5 py-1.5 text-[11px] font-bold shadow-sm"
               >
-                Add number
+                Connect
               </button>
             )}
           </div>
@@ -165,39 +179,49 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
       ) : (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="flex items-center gap-2 text-[12px] font-bold text-[var(--foreground)]">
-              <TbBrandWhatsapp className="h-4 w-4 text-[#25D366]" />
+            <span className="flex items-center gap-2 text-[12px] font-bold text-[#111827]">
+              <TbBrandWhatsapp className="h-4 w-4 text-[#128C7E]" />
               {number ? 'Update WhatsApp Number' : 'Connect WhatsApp Number'}
             </span>
             <button
               type="button"
               onClick={handleCancel}
-              className="rounded-lg p-1 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              className="rounded-lg p-1 text-[var(--muted-foreground)] hover:text-[#111827]"
             >
               <TbX className="h-4 w-4" />
             </button>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row">
-            <input
-              type="tel"
-              value={inputVal}
-              onChange={(e) => setInputVal(e.target.value)}
-              placeholder="+1 555 123 4567 or +91 98765 43210"
-              className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--surface)] px-3.5 py-2 font-mono-code text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none focus:border-[var(--brand)] focus:shadow-[0_0_0_3px_var(--brand-soft)]"
-              autoFocus
-            />
+            <div className="flex flex-1 items-center rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 transition-all focus-within:border-[var(--brand)] focus-within:ring-2 focus-within:ring-[var(--brand-soft)]">
+              <div className="flex items-center gap-1 border-r border-black/10 pr-2 mr-2 text-xs font-bold text-[#111827]">
+                <span>🇮🇳</span>
+                <span>+91</span>
+              </div>
+              <input
+                type="tel"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={formattedDisplay}
+                onChange={(e) => handleDigitsChange(e.target.value)}
+                placeholder="98765 43210"
+                maxLength={11}
+                className="w-full bg-transparent font-mono-code text-[13px] font-medium text-[#111827] placeholder:text-[var(--muted-foreground)]/60 outline-none"
+                autoFocus
+              />
+            </div>
+
             <div className="flex items-center gap-1.5 shrink-0">
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={loading || !inputVal.trim()}
-                className="btn-brand pressable inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold disabled:opacity-50"
+                disabled={loading || digits.length !== 10}
+                className="btn-brand pressable inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <TbLoaderQuarter className="h-3.5 w-3.5 animate-spin" />
                 ) : (
-                  <TbCheck className="h-3.5 w-3.5" />
+                  <TbCheck className="h-3.5 w-3.5 stroke-[2.5]" />
                 )}
                 Save
               </button>
@@ -205,14 +229,14 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
                 type="button"
                 onClick={handleCancel}
                 disabled={loading}
-                className="pressable rounded-xl border border-[var(--border)] bg-white px-3 py-2 text-xs font-semibold text-[var(--muted-foreground)] hover:bg-[var(--surface)] hover:text-[var(--foreground)]"
+                className="pressable rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-semibold text-[var(--muted-foreground)] hover:bg-black/5 hover:text-[#111827]"
               >
                 Cancel
               </button>
             </div>
           </div>
-          <p className="text-[10px] text-[var(--muted-foreground)]">
-            Include country code with <code className="font-mono-code text-[10px]">+</code>. Messages will be sent only when deployments succeed or fail.
+          <p className="text-[10.5px] text-[var(--muted-foreground)]">
+            Only 10-digit numbers for automated deploy receipts.
           </p>
         </div>
       )}

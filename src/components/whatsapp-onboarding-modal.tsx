@@ -2,16 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import {
-  TbBrandWhatsapp,
-  TbCheck,
-  TbLoaderQuarter,
-  TbX,
-  TbShieldCheck,
-  TbExternalLink,
-  TbFlame,
-  TbBellRinging,
-} from 'react-icons/tb'
+import { TbBrandWhatsapp, TbCheck, TbLoaderQuarter, TbX, TbArrowRight } from 'react-icons/tb'
 import { toast } from 'sonner'
 
 interface WhatsAppOnboardingModalProps {
@@ -21,30 +12,9 @@ interface WhatsAppOnboardingModalProps {
   } | null
 }
 
-const BENEFIT_CHIPS = [
-  {
-    icon: TbExternalLink,
-    title: 'Live Preview URLs',
-    desc: 'Direct links delivered to your chat the second code ships',
-    color: 'text-[var(--brand)] bg-[var(--brand-soft)]',
-  },
-  {
-    icon: TbBellRinging,
-    title: 'Out-of-Band Alerts',
-    desc: 'Stay informed without keeping the laptop or browser open',
-    color: 'text-[#25D366] bg-[#25D366]/10',
-  },
-  {
-    icon: TbShieldCheck,
-    title: 'Zero Noise Guarantee',
-    desc: 'Only pings for tasks and deployments you explicitly approve',
-    color: 'text-amber-500 bg-amber-500/10',
-  },
-]
-
 export function WhatsAppOnboardingModal({ user }: WhatsAppOnboardingModalProps) {
   const [isOpen, setIsOpen] = useState(false)
-  const [phone, setPhone] = useState('')
+  const [digits, setDigits] = useState('')
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -80,20 +50,30 @@ export function WhatsAppOnboardingModal({ user }: WhatsAppOnboardingModalProps) 
     setIsOpen(false)
   }
 
+  const handleDigitsChange = (val: string) => {
+    // Only allow digits, max 10 digits
+    const cleaned = val.replace(/\D/g, '').slice(0, 10)
+    setDigits(cleaned)
+  }
+
+  // Format 10 digits into "98765 43210"
+  const formattedDisplay = digits.length > 5 ? `${digits.slice(0, 5)} ${digits.slice(5)}` : digits
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    const raw = phone.trim()
-    if (!raw) {
-      toast.warning('Please enter your phone number with country code')
+    if (digits.length !== 10) {
+      toast.warning('Please enter a valid 10-digit mobile number')
       return
     }
 
+    const fullNumber = `+91${digits}`
     setLoading(true)
+
     try {
       const res = await fetch('/api/settings/whatsapp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ whatsappNumber: raw }),
+        body: JSON.stringify({ whatsappNumber: fullNumber }),
       })
       const data = await res.json()
 
@@ -102,16 +82,16 @@ export function WhatsAppOnboardingModal({ user }: WhatsAppOnboardingModalProps) 
           localStorage.setItem(`waycode_whatsapp_prompted_${user.id}`, 'configured')
         }
         setIsOpen(false)
-        toast.success('WhatsApp deploy receipts enabled!', {
-          description: `Connected to ${data.whatsappNumber}`,
+        toast.success('WhatsApp notifications connected', {
+          description: `Receipts will be sent to +91 ${formattedDisplay}`,
         })
       } else {
-        toast.error('Could not save WhatsApp number', {
-          description: data.error || 'Please include your country code (e.g. +91 or +1).',
+        toast.error('Failed to connect WhatsApp', {
+          description: data.error || 'Please check your 10-digit phone number.',
         })
       }
     } catch {
-      toast.error('Network error while saving WhatsApp number')
+      toast.error('Network error while connecting WhatsApp')
     } finally {
       setLoading(false)
     }
@@ -121,146 +101,141 @@ export function WhatsAppOnboardingModal({ user }: WhatsAppOnboardingModalProps) 
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-          {/* Backdrop with rich blur */}
+          {/* Minimalist Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleDismiss}
-            className="absolute inset-0 bg-slate-950/60 backdrop-blur-md transition-all"
+            className="absolute inset-0 bg-[#090d16]/50 backdrop-blur-sm transition-all"
           />
 
-          {/* Modal Container */}
+          {/* Modal Card */}
           <motion.div
             role="dialog"
             aria-modal="true"
-            initial={{ scale: 0.94, opacity: 0, y: 16 }}
+            initial={{ scale: 0.96, opacity: 0, y: 8 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
-            exit={{ scale: 0.96, opacity: 0, y: 10 }}
-            transition={{ type: 'spring', stiffness: 400, damping: 32 }}
-            className="relative w-full max-w-[440px] overflow-hidden rounded-[32px] border border-black/[0.08] bg-white/95 p-6 sm:p-7 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.22)] backdrop-blur-xl dark:border-white/[0.12] dark:bg-slate-900/95"
+            exit={{ scale: 0.98, opacity: 0, y: 6 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="relative w-full max-w-[390px] overflow-hidden rounded-[26px] border border-black/[0.08] bg-white p-6 shadow-[0_20px_50px_-12px_rgba(0,0,0,0.18)]"
           >
-            {/* Ambient Top Glow */}
-            <div
-              aria-hidden
-              className="pointer-events-none absolute -right-12 -top-12 h-44 w-44 rounded-full bg-gradient-to-br from-[#25D366]/20 via-[#0066FF]/15 to-transparent blur-3xl"
-            />
-
-            {/* Header */}
-            <div className="relative flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3.5">
-                <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#25D366]/30 bg-gradient-to-br from-[#25D366]/20 to-[#128C7E]/10 text-[#25D366] shadow-[0_4px_16px_-2px_rgba(37,211,102,0.35)]">
-                  <TbBrandWhatsapp className="h-6 w-6" />
-                  <span className="absolute -bottom-0.5 -right-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[#25D366] ring-2 ring-white dark:ring-slate-900">
-                    <TbFlame className="h-2 w-2 text-white" />
-                  </span>
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-[17px] font-extrabold tracking-tight text-[var(--foreground)]">
-                      WhatsApp Receipts
-                    </h3>
-                    <span className="inline-flex items-center rounded-full bg-[#25D366]/10 px-2 py-0.5 text-[9.5px] font-bold text-[#25D366] ring-1 ring-inset ring-[#25D366]/25">
-                      LIVE ALERTS
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-[12px] font-medium text-[var(--muted-foreground)]">
-                    Get instant deploy URLs right to your phone
-                  </p>
-                </div>
+            {/* Top Bar */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#25D366]/10 text-[#128C7E]">
+                  <TbBrandWhatsapp className="h-4 w-4" />
+                </span>
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                  WhatsApp Alerts
+                </span>
               </div>
 
               <button
                 type="button"
                 onClick={handleDismiss}
-                className="pressable -mr-1 -mt-1 rounded-full p-2 text-[var(--muted-foreground)] transition-colors hover:bg-black/5 hover:text-[var(--foreground)] dark:hover:bg-white/10"
+                className="pressable -mr-1 rounded-full p-1.5 text-[var(--muted-foreground)] transition-colors hover:bg-black/5 hover:text-[var(--foreground)]"
                 aria-label="Close"
               >
                 <TbX className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Feature Chips */}
-            <div className="relative mt-5 space-y-2">
-              {BENEFIT_CHIPS.map((chip, i) => {
-                const Icon = chip.icon
-                return (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 rounded-2xl border border-black/[0.04] bg-black/[0.02] p-2.5 transition-colors dark:border-white/[0.06] dark:bg-white/[0.03]"
-                  >
-                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${chip.color}`}>
-                      <Icon className="h-4 w-4" />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[12px] font-bold tracking-tight text-[var(--foreground)]">
-                        {chip.title}
-                      </p>
-                      <p className="truncate text-[10.5px] text-[var(--muted-foreground)]">
-                        {chip.desc}
-                      </p>
-                    </div>
-                  </div>
-                )
-              })}
+            {/* Title & Description */}
+            <div className="mt-4">
+              <h3 className="text-[19px] font-bold tracking-tight text-[#111827]">
+                Never miss a shipped task
+              </h3>
+              <p className="mt-1 text-[13px] text-[var(--foreground-secondary)] leading-relaxed">
+                Get an instant ping on WhatsApp with the live preview link whenever your approved PR lands.
+              </p>
             </div>
 
+            {/* Minimalist Message Preview Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="mt-4 rounded-2xl border border-black/[0.06] bg-[#f8fafc] p-3.5"
+            >
+              <div className="flex items-center justify-between text-[10.5px] text-[var(--muted-foreground)]">
+                <span className="flex items-center gap-1.5 font-medium text-[#111827]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#25D366]" />
+                  WayCode Gateway
+                </span>
+                <span>Just now</span>
+              </div>
+              <p className="mt-1.5 text-[12px] font-semibold text-[#1e293b]">
+                ✅ Task Shipped &bull; <span className="font-normal text-[var(--foreground-secondary)]">feat: add auth flow</span>
+              </p>
+              <div className="mt-1.5 inline-flex items-center gap-1 rounded-md bg-white px-2 py-0.5 text-[11px] font-mono-code font-medium text-[var(--brand)] border border-black/[0.04]">
+                <span>https://preview.waycode.dev/deploy/8a959</span>
+              </div>
+            </motion.div>
+
             {/* Form */}
-            <form onSubmit={handleSave} className="relative mt-5 space-y-4">
+            <form onSubmit={handleSave} className="mt-5 space-y-3">
               <div>
-                <label className="mb-1.5 flex items-center justify-between text-[11px] font-bold uppercase tracking-[0.08em] text-[var(--muted-foreground)]">
-                  <span>Your WhatsApp Number</span>
-                  <span className="font-normal lowercase tracking-normal text-[10px] text-[var(--muted-foreground)]">
-                    country code required
-                  </span>
+                <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-foreground)]">
+                  Mobile Number
                 </label>
 
-                <div className="group relative flex items-center rounded-2xl border border-black/10 bg-white shadow-[var(--shadow-sm)] transition-all focus-within:border-[#25D366] focus-within:ring-4 focus-within:ring-[#25D366]/15 dark:border-white/10 dark:bg-slate-950">
-                  <span className="flex items-center pl-3.5 pr-2 text-sm text-[var(--muted-foreground)]">
-                    <TbBrandWhatsapp className="h-4 w-4 text-[#25D366]" />
-                  </span>
+                <div className="flex items-center rounded-xl border border-[var(--border-strong)] bg-white px-3 py-2 transition-all focus-within:border-[var(--brand)] focus-within:ring-2 focus-within:ring-[var(--brand-soft)]">
+                  {/* Fixed Country Code */}
+                  <div className="flex items-center gap-1.5 border-r border-black/10 pr-2.5 mr-2.5 text-xs font-bold text-[#111827]">
+                    <span className="text-sm">🇮🇳</span>
+                    <span>+91</span>
+                  </div>
+
+                  {/* 10 Digit Input */}
                   <input
                     type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+91 98765 43210 or +1 555 0199"
-                    className="h-11 w-full rounded-2xl bg-transparent pr-3.5 font-mono-code text-[13px] text-[var(--foreground)] placeholder:text-[var(--muted-foreground)]/60 outline-none"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={formattedDisplay}
+                    onChange={(e) => handleDigitsChange(e.target.value)}
+                    placeholder="98765 43210"
+                    maxLength={11}
+                    className="w-full bg-transparent font-mono-code text-[14px] font-medium text-[#111827] placeholder:text-[var(--muted-foreground)]/60 outline-none"
                     autoFocus
                   />
+
+                  {digits.length === 10 && (
+                    <TbCheck className="h-4 w-4 text-[var(--success)] shrink-0" />
+                  )}
                 </div>
+                <p className="mt-1 text-[10.5px] text-[var(--muted-foreground)]">
+                  Enter your 10-digit phone number.
+                </p>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center gap-2.5 pt-1">
+              <div className="flex items-center gap-2 pt-1">
                 <button
                   type="submit"
-                  disabled={loading || !phone.trim()}
-                  className="pressable flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#25D366] to-[#1ebe5d] py-3 text-[12.5px] font-bold text-white shadow-[0_4px_18px_-2px_rgba(37,211,102,0.4)] transition-all hover:brightness-105 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none"
+                  disabled={loading || digits.length !== 10}
+                  className="pressable flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#111827] py-2.5 text-[13px] font-semibold text-white shadow-sm transition-all hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <TbLoaderQuarter className="h-4 w-4 animate-spin" />
                   ) : (
-                    <TbCheck className="h-4 w-4 stroke-[2.5]" />
+                    <>
+                      <span>Connect WhatsApp</span>
+                      <TbArrowRight className="h-4 w-4" />
+                    </>
                   )}
-                  Enable WhatsApp Alerts
                 </button>
 
                 <button
                   type="button"
                   onClick={handleDismiss}
                   disabled={loading}
-                  className="pressable rounded-2xl border border-black/10 bg-white/80 px-4 py-3 text-[12.5px] font-semibold text-[var(--foreground-secondary)] transition-all hover:bg-black/5 hover:text-[var(--foreground)] dark:border-white/10 dark:bg-slate-800 dark:hover:bg-slate-700"
+                  className="pressable rounded-xl px-3.5 py-2.5 text-[12.5px] font-medium text-[var(--muted-foreground)] hover:text-[#111827] hover:bg-black/5"
                 >
-                  Later
+                  Skip
                 </button>
               </div>
             </form>
-
-            {/* Footer Notice */}
-            <div className="relative mt-4 flex items-center justify-center gap-1.5 text-[10.5px] text-[var(--muted-foreground)]">
-              <TbShieldCheck className="h-3.5 w-3.5 shrink-0 text-[var(--success)]" />
-              <span>Encrypted at rest. Change or remove anytime in Profile.</span>
-            </div>
           </motion.div>
         </div>
       )}
