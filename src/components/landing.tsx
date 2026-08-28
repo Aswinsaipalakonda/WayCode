@@ -490,20 +490,34 @@ export function Landing() {
             ))}
           </div>
 
-          {/* Right Action / Auth Button */}
+          {/* Right Action / Open-Source & Auth Buttons */}
           <div className="flex items-center gap-2">
+            {/* Open Source GitHub Button */}
+            <a
+              href="https://github.com/Aswinsaipalakonda/WayCode"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-3.5 py-1.5 rounded-full bg-gray-100/90 hover:bg-gray-200 text-gray-900 border border-gray-200/80 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 hover:scale-105 group"
+              title="Star WayCode on GitHub"
+            >
+              <GithubIcon className="w-3.5 h-3.5 group-hover:rotate-12 transition-transform" />
+              <span className="hidden sm:inline">GitHub</span>
+              <span className="text-[10px] text-amber-500 font-extrabold">★</span>
+            </a>
+
+            {/* Login / Auth Button */}
             <button
               onClick={signInWithGitHub}
-              className="px-4 py-2 rounded-full bg-black text-white text-xs font-bold hover:bg-gray-800 transition-all shadow-sm flex items-center gap-1.5"
+              className="px-4 py-1.5 rounded-full bg-black text-white text-xs font-bold hover:bg-gray-800 transition-all shadow-sm hover:scale-105 flex items-center gap-1.5"
             >
-              <GithubIcon className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Connect</span>
+              <span>Login</span>
+              <span className="text-[10px]">→</span>
             </button>
 
             {/* Mobile Hamburger */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden w-10 h-10 rounded-full bg-gray-100/80 hover:bg-gray-200 text-gray-900 flex items-center justify-center transition-colors"
+              className="md:hidden w-10 h-10 rounded-full bg-gray-100/80 hover:bg-gray-200 text-gray-900 flex items-center justify-center transition-colors ml-1"
               aria-label="Toggle menu"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -515,16 +529,35 @@ export function Landing() {
 
         {/* Mobile Dropdown Drawer */}
         {mobileMenuOpen && (
-          <div className="md:hidden max-w-5xl mx-auto mt-2 p-4 rounded-3xl bg-white/95 backdrop-blur-2xl border border-gray-100 shadow-2xl space-y-1.5 text-center">
+          <div className="md:hidden max-w-5xl mx-auto mt-2 p-4 rounded-3xl bg-white/95 backdrop-blur-2xl border border-gray-100 shadow-2xl space-y-2 text-center">
             {['problem', 'architecture', 'workflow', 'research', 'roadmap'].map((sec) => (
               <button
                 key={sec}
-                className="w-full py-2.5 rounded-2xl text-sm font-bold text-gray-800 hover:bg-gray-100/80 capitalize transition"
+                className="w-full py-2 rounded-2xl text-sm font-bold text-gray-800 hover:bg-gray-100/80 capitalize transition"
                 onClick={() => scrollTo(sec)}
               >
                 {sec}
               </button>
             ))}
+
+            <div className="pt-3 border-t border-gray-100 grid grid-cols-2 gap-2">
+              <a
+                href="https://github.com/Aswinsaipalakonda/WayCode"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="py-2.5 px-3 rounded-2xl bg-gray-100 text-gray-900 text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-gray-200 transition"
+              >
+                <GithubIcon className="w-4 h-4" />
+                <span>GitHub Repo</span>
+              </a>
+              <button
+                onClick={signInWithGitHub}
+                className="py-2.5 px-3 rounded-2xl bg-black text-white text-xs font-bold flex items-center justify-center gap-1.5 hover:bg-gray-800 transition"
+              >
+                <span>Login</span>
+                <span>→</span>
+              </button>
+            </div>
           </div>
         )}
       </nav>
@@ -1386,7 +1419,7 @@ export function Landing() {
                       </svg>
                     ),
                     items: [
-                      { name: 'Next.js 16', icon: '/images/icons/nextjs.svg' },
+                      { name: 'Next.js 16', icon: 'https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/nextjs.png' },
                       { name: 'TypeScript', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/typescript/typescript-original.svg' },
                       { name: 'Tailwind CSS', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/tailwindcss/tailwindcss-original.svg' },
                     ],
@@ -1434,7 +1467,7 @@ export function Landing() {
                       </svg>
                     ),
                     items: [
-                      { name: 'OpenRouter AI', icon: '/images/icons/openrouter.svg', whiteBg: true },
+                      { name: 'OpenRouter AI', icon: 'https://raw.githubusercontent.com/lobehub/lobe-icons/refs/heads/master/packages/static-png/dark/openrouter-color.png', whiteBg: false },
                       { name: 'Google Gemini', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/google/google-original.svg' },
                       { name: 'Anthropic Claude', icon: '/images/icons/claude.svg' },
                     ],
@@ -1452,7 +1485,7 @@ export function Landing() {
                     items: [
                       { name: 'Git Engine', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/git/git-original.svg' },
                       { name: 'Vercel CI/CD', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/vercel/vercel-original.svg', invert: true },
-                      { name: 'WhatsApp Alerts', icon: '/images/icons/whatsapp.svg' },
+                      { name: 'WhatsApp Alerts', icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/6/6b/WhatsApp.svg/960px-WhatsApp.svg.png' },
                     ],
                   },
                 ] as Array<{
@@ -1737,14 +1770,17 @@ export function Landing() {
                   className="px-8 py-4 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-extrabold text-sm shadow-xl shadow-blue-500/30 hover:scale-105 transition-all duration-300 flex items-center gap-2"
                 >
                   <GithubIcon className="w-4 h-4" />
-                  <span>Get Started with GitHub</span>
+                  <span>Get Started / Login</span>
                 </button>
-                <button
-                  onClick={() => scrollTo('architecture')}
-                  className="px-8 py-4 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-white font-extrabold text-sm backdrop-blur-md hover:scale-105 transition-all duration-300"
+                <a
+                  href="https://github.com/Aswinsaipalakonda/WayCode"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-8 py-4 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-white font-extrabold text-sm backdrop-blur-md hover:scale-105 transition-all duration-300 flex items-center gap-2"
                 >
-                  Explore Architecture ↓
-                </button>
+                  <GithubIcon className="w-4 h-4" />
+                  <span>Star on GitHub ★</span>
+                </a>
               </div>
 
               <div className="mt-14 pt-8 border-t border-white/10 flex flex-wrap items-center justify-center gap-3 text-xs font-bold text-gray-400">
@@ -1762,13 +1798,21 @@ export function Landing() {
       {/* FOOTER */}
       <footer className="border-t border-black/5 py-12 px-4 sm:px-6 lg:px-10 text-xs text-gray-500 font-medium">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
-          <div>WayCode — System Concept & Stakeholder Communication Framework</div>
-          <div className="flex gap-4">
-            <span>AI Systems</span>
+          <div>WayCode — Autonomous AI Software Engineering Agents</div>
+          <div className="flex items-center gap-4">
+            <a
+              href="https://github.com/Aswinsaipalakonda/WayCode"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-black font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <GithubIcon className="w-3.5 h-3.5" />
+              <span>GitHub (Aswinsaipalakonda/WayCode)</span>
+            </a>
             <span>•</span>
             <span>Distributed Computing</span>
             <span>•</span>
-            <span>Software Engineering</span>
+            <span>Open Source</span>
           </div>
         </div>
       </footer>
