@@ -1386,7 +1386,7 @@ export function Landing() {
                       </svg>
                     ),
                     items: [
-                      { name: 'Next.js 16', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/nextjs/nextjs-original.svg', invert: true },
+                      { name: 'Next.js 16', icon: '/images/icons/nextjs.svg' },
                       { name: 'TypeScript', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/typescript/typescript-original.svg' },
                       { name: 'Tailwind CSS', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/tailwindcss/tailwindcss-original.svg' },
                     ],
@@ -1434,9 +1434,9 @@ export function Landing() {
                       </svg>
                     ),
                     items: [
-                      { name: 'OpenRouter AI', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/openai/openai-original.svg', whiteBg: true },
+                      { name: 'OpenRouter AI', icon: '/images/icons/openrouter.svg', whiteBg: true },
                       { name: 'Google Gemini', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/google/google-original.svg' },
-                      { name: 'Anthropic Claude', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/python/python-original.svg' },
+                      { name: 'Anthropic Claude', icon: '/images/icons/claude.svg' },
                     ],
                   },
                   {
@@ -1452,7 +1452,7 @@ export function Landing() {
                     items: [
                       { name: 'Git Engine', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/git/git-original.svg' },
                       { name: 'Vercel CI/CD', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/vercel/vercel-original.svg', invert: true },
-                      { name: 'WhatsApp Alerts', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/fastapi/fastapi-original.svg' },
+                      { name: 'WhatsApp Alerts', icon: '/images/icons/whatsapp.svg' },
                     ],
                   },
                 ] as Array<{
@@ -1466,20 +1466,20 @@ export function Landing() {
               ).map((group) => (
                 <div
                   key={group.cat}
-                  className={`bg-white/[0.05] rounded-3xl p-6 border border-white/10 ${group.hoverBorder} backdrop-blur-xl shadow-2xl hover:-translate-y-2 transition-all duration-300 group`}
+                  className={`bg-white/[0.05] rounded-3xl p-5 sm:p-6 border border-white/10 ${group.hoverBorder} backdrop-blur-xl shadow-2xl hover:-translate-y-2 transition-all duration-300 group`}
                 >
-                  <div className="flex items-center gap-2.5 mb-6">
-                    <div className={`w-9 h-9 rounded-2xl ${group.iconBg} border flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
+                  <div className="flex items-center gap-2.5 mb-6 min-w-0">
+                    <div className={`w-8 h-8 rounded-xl ${group.iconBg} border flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
                       {group.catIcon}
                     </div>
-                    <span className={`text-xs font-black uppercase tracking-wider ${group.color} truncate`}>{group.cat}</span>
+                    <span className={`text-[11px] sm:text-xs font-black uppercase tracking-tight ${group.color} truncate`}>{group.cat}</span>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-2.5">
                     {group.items.map((i) => (
                       <div
                         key={i.name}
-                        className="p-3 rounded-2xl bg-white/[0.04] border border-white/5 flex items-center gap-3 hover:bg-white/[0.08] hover:border-white/20 transition duration-200"
+                        className="p-2.5 sm:p-3 rounded-2xl bg-white/[0.04] border border-white/5 flex items-center gap-2.5 hover:bg-white/[0.08] hover:border-white/20 transition duration-200"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -1489,7 +1489,7 @@ export function Landing() {
                             i.whiteBg ? 'bg-white rounded-full p-0.5' : ''
                           } ${i.invert ? 'brightness-0 invert' : ''}`}
                         />
-                        <span className="font-extrabold text-xs text-white truncate">{i.name}</span>
+                        <span className="font-extrabold text-[11px] sm:text-xs text-white truncate tracking-tight">{i.name}</span>
                       </div>
                     ))}
                   </div>
