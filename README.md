@@ -50,28 +50,155 @@ The developer expresses **intent** (*"Add a Supabase auth hook to the checkout p
 
 ---
 
-## 📊 Database Schema (Supabase BaaS)
+## 📊 Database Schema & Data Models (Supabase BaaS)
 
-<details>
-<summary><b>Click to expand Database Tables & Models</b></summary>
+WayCode leverages **Supabase PostgreSQL** with **Row-Level Security (RLS)** and **Realtime Change Data Capture (CDC)** to maintain high-throughput state isolation across multiple tenants and mobile clients.
 
-- `user_settings`: User BYOK provider configuration, encrypted API keys, model selections.
-- `repositories`: Connected GitHub repositories and default branch context.
-- `task_jobs`: State machine tracking jobs (`queued` → `processing` → `verifying` → `completed` / `failed` / `rejected`).
-- `task_logs`: Realtime append-only telemetry stream tagged by phase (`clone`, `plan`, `tool_call`, `edit`, `build`, `self_heal`).
+```mermaid
+erDiagram
+    USERS ||--o{ USER_SETTINGS : "configures"
+    USERS ||--o{ REPOSITORIES : "owns / connects"
+    REPOSITORIES ||--o{ TASK_JOBS : "dispatches"
+    TASK_JOBS ||--o{ TASK_LOGS : "streams telemetry"
+    TASK_JOBS ||--o{ CONVERSATIONS : "contextualizes"
 
-</details>
+    USER_SETTINGS {
+        uuid id PK
+        uuid user_id FK
+        string default_provider "openrouter | gemini | custom"
+        text encrypted_api_key "AES-GCM Encrypted Vault"
+        string selected_model "e.g. gemini-2.0-flash"
+        string whatsapp_phone "E.164 phone number"
+        jsonb notification_preferences
+        timestamp updated_at
+    }
+
+    REPOSITORIES {
+        uuid id PK
+        uuid user_id FK
+        string full_name "owner/repo"
+        string default_branch "main"
+        string clone_url
+        boolean is_private
+        timestamp synced_at
+    }
+
+    TASK_JOBS {
+        uuid id PK
+        uuid user_id FK
+        uuid repository_id FK
+        text user_intent "Prompt / instruction"
+        string status "queued | processing | verifying | approval_pending | completed | rejected | failed"
+        string target_branch "waycode/task-xyz"
+        text diff_content "Unified git diff"
+        jsonb build_metrics
+        string deploy_preview_url "Vercel / Cloud URL"
+        timestamp created_at
+        timestamp completed_at
+    }
+
+    TASK_LOGS {
+        uuid id PK
+        uuid task_id FK
+        string phase "clone | plan | tool_call | edit | verify | self_heal"
+        text message "Log entry"
+        string log_level "info | warn | error | success"
+        jsonb metadata
+        timestamp created_at
+    }
+```
+
+### Table Breakdown
+
+| Table | Purpose | Security & RLS Policy |
+| :--- | :--- | :--- |
+| **`user_settings`** | Stores encrypted BYOK keys, default model selections, and notification settings. | `auth.uid() = user_id` (Strict Owner Isolation) |
+| **`repositories`** | Syncs user GitHub repositories, webhooks, and default branch configurations. | `auth.uid() = user_id` |
+| **`task_jobs`** | State machine for active engineering tasks, diffs, build outputs, and approval gates. | `auth.uid() = user_id` |
+| **`task_logs`** | High-frequency telemetry log stream ingested via Supabase Realtime CDC. | `auth.uid() = (SELECT user_id FROM task_jobs WHERE id = task_logs.task_id)` |
+| **`conversations`** | Contextual multi-turn chat memory and session snapshots. | `auth.uid() = user_id` |
 
 ---
 
-## 🚀 Getting Started
+## ⚙️ How It Works: The 9-Stage Autonomous Lifecycle
+
+WayCode decouples the mobile client from the execution runtime through a multi-stage distributed pipeline:
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as 📱 Developer (Mobile)
+    participant UI as ⚡ WayCode Next.js App
+    participant Redis as 🔄 Redis Queue
+    participant Daemon as 🤖 Node.js VPS Daemon
+    participant LLM as 🧠 LLM / OpenRouter API
+    participant Git as 📦 GitHub & Vercel
+    participant Meta as 💬 WhatsApp Cloud API
+
+    Dev->>UI: Submit Natural Language Intent
+    UI->>Redis: Enqueue Job (HTTP 202 Accepted)
+    UI-->>Dev: Return Instant Task ID & Realtime Channel
+    Redis->>Daemon: Dequeue Task for Worker
+    Daemon->>Git: Clone repo & checkout ephemeral branch
+    Daemon->>LLM: Ingest Context + Generate Code Plan & Edits
+    LLM-->>Daemon: Return Tool Calls & File Changes
+    Daemon->>Daemon: Apply diff & run `npx tsc --noEmit`
+    alt Self-Healing Required
+        Daemon->>LLM: Feed compiler errors for auto-repair
+        LLM-->>Daemon: Patched code modification
+    end
+    Daemon->>UI: Stream live logs & Git diff via Supabase Realtime
+    UI-->>Dev: Notify "Approval Gate Ready" on Mobile
+    Dev->>UI: Tap "Approve & Push to Production"
+    UI->>Daemon: Trigger push confirmation
+    Daemon->>Git: Git Push & Trigger Vercel Deploy Hook
+    Git-->>Daemon: Vercel Preview URL generated
+    Daemon->>Meta: Send WhatsApp message with preview URL
+    Meta-->>Dev: Direct WhatsApp alert with live test link
+```
+
+### Detailed Lifecycle Stages
+
+1. **Intent Ingestion & Parsing**: The developer inputs a task (*"Add WhatsApp webhook verification in `/api/whatsapp`"*) from their mobile browser or PWA.
+2. **GitHub PKCE OAuth Authentication**: GitHub OAuth verifies identity and ensures token permissions are scoped exclusively to user-selected repositories.
+3. **Asynchronous Redis Queue Dispatch**: The server enqueues the job into Redis with an instant `HTTP 202 Accepted` response. If mobile connection drops, the cloud job executes unimpeded.
+4. **Agent Reasoning & LLM Tool Execution**: The cloud worker prompts the selected model (Gemini, Claude, DeepSeek) with system prompt context, AST file tools (`view_file`, `replace_file_content`, `run_command`).
+5. **Isolated Workspace Sandbox**: Files are manipulated inside an ephemeral sandboxed directory with git version history preserved.
+6. **Self-Healing Compiler Feedback Loop**: The daemon executes automated type checking and linting (`npx tsc --noEmit`). Any compiler errors are fed back into the LLM context for bounded auto-correction before human review.
+7. **Safe Mobile Diff Review & Approval Gate**: The developer reviews interactive additions (`#10B981`) and deletions (`#EF4444`) on their phone and provides an explicit **Approval** or **Rejection with Feedback**.
+8. **Production Git Push & Vercel Trigger**: Upon approval, the daemon commits and pushes the branch to GitHub, triggering CI/CD preview deployments via Vercel Deploy Webhooks.
+9. **Out-of-Band Realtime Push Notification**: An instant Meta WhatsApp Cloud API alert arrives on the developer's mobile device with the live preview URL.
+
+---
+
+## 🌟 SaaS Features & Highlights
+
+### 🔑 Bring Your Own Key (BYOK) Engine
+- **Multi-Provider Hub**: Toggle between **OpenRouter**, **Google Gemini direct**, **Anthropic Claude**, and custom **OpenAI-compatible** endpoints.
+- **Zero-Cost Presets**: Built-in support for free tier models (`gemini-2.0-flash-exp:free`, `deepseek-r1:free`, `llama-3.3-70b-instruct:free`, `qwen-2.5-coder-32b:free`).
+- **Interactive Connection Tester**: Kiro-style validation ping checking credentials, latency, and model availability before saving.
+- **AES-GCM Key Vault**: Keys are encrypted at rest using modern cryptographic primitives.
+
+### 📱 Mobile-First Autonomous Control Plane
+- **PWA Ready**: Installable on iOS (Safari Add to Home Screen) and Android (Chrome Web APK).
+- **Interactive Unified Diff Viewer**: Syntax highlighted, pinch-to-zoom, file tree navigator, and jump-to-line selector.
+- **Connection-Independent Resilience**: Close your laptop, step on a flight, or lose cellular service — task jobs persist in Redis and resume telemetry streaming on reconnect.
+
+### 📡 Realtime Observability & Telemetry
+- **6-Phase Log Streamer**: Realtime categorization (`clone` → `plan` → `tool_call` → `edit` → `verify` → `deploy`).
+- **Terminal Simulation**: Filter logs by level (`info`, `warn`, `error`, `success`) with timestamp precision.
+
+---
+
+## 🚀 Self-Hosting & Quickstart
 
 ### Prerequisites
-- Node.js `20.x` or higher
-- Docker Desktop (Windows / macOS)
-- Supabase Project & Credentials
+- **Node.js**: `20.x` or higher
+- **Package Manager**: `npm`, `pnpm`, or `bun`
+- **Docker**: For running Redis & Sandboxed containers
+- **Supabase Account**: Free or Pro tier project
 
-### 1. Clone & Install
+### 1. Clone & Install Dependencies
 ```bash
 git clone https://github.com/Aswinsaipalakonda/WayCode.git
 cd WayCode
@@ -79,26 +206,102 @@ npm install
 ```
 
 ### 2. Configure Environment Variables
-Create a `.env.local` file in the root directory:
+Create `.env.local` in the project root:
+
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://cczeusftmsaykelqyfgu.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+# Supabase Configuration
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
+
+# Redis Queue Connection
 REDIS_URL=redis://127.0.0.1:6379
+
+# Encryption Secret for BYOK Vault (32-char hex string)
+ENCRYPTION_SECRET=your_32_character_encryption_secret_key
+
+# Optional: Meta WhatsApp Cloud API (Out-of-band alerts)
+WHATSAPP_API_TOKEN=your_meta_whatsapp_api_token
+WHATSAPP_PHONE_NUMBER_ID=your_whatsapp_phone_number_id
+
+# Optional: GitHub OAuth & Vercel
+GITHUB_CLIENT_ID=your_github_oauth_client_id
+GITHUB_CLIENT_SECRET=your_github_oauth_client_secret
+VERCEL_DEPLOY_HOOK_URL=your_vercel_deploy_hook_url
 ```
 
-### 3. Run Local Infrastructure (Redis Queue)
+### 3. Start Local Redis via Docker
 ```bash
 docker run -d --name waycode-redis -p 6379:6379 redis:alpine
 ```
 
-### 4. Start Development Server
+### 4. Run Database Schema Setup
+Run the SQL migration in your Supabase SQL Editor or via Supabase CLI:
+```bash
+supabase db push
+```
+
+### 5. Launch the Development Server
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) on your browser or mobile device.
+Open [http://localhost:3000](http://localhost:3000) on your browser or mobile network.
 
 ---
 
-## 📄 License
+## 🧪 Testing & Quality Assurance
 
-This project is licensed under the MIT License — see the LICENSE file for details.
+WayCode maintains strict quality gates across unit tests, type safety, and production build pipelines:
+
+```bash
+# Run Vitest unit & integration test suites
+npm test
+
+# Run TypeScript compilation check
+npx tsc --noEmit
+
+# Run Next.js production build bundle validation
+npm run build
+```
+
+---
+
+## 🔒 Security & Privacy Architecture
+
+- **Zero Data Exposure**: Code diffs and prompts are transmitted only between your mobile client, your private VPS worker daemon, and your chosen LLM endpoint.
+- **Ephemeral Sandbox Directories**: All git repositories are checked out into temporary filesystem workspaces with isolated file permissions.
+- **Row-Level Security (RLS)**: Enforces strict tenant separation at the database engine level; unauthorized cross-user queries are rejected by Postgres.
+- **Encrypted Secrets**: Sensitive API keys and tokens are encrypted with `AES-256-GCM` using customer-managed cryptographic seeds.
+
+---
+
+## 🗺️ Roadmap & Milestones
+
+- [x] **v1.0**: Core Next.js 16 App Router interface, GitHub OAuth, and mobile landing page.
+- [x] **v2.0**: Redis persistent task queue, Supabase Realtime CDC telemetry, and BYOK settings vault.
+- [x] **v2.4**: Self-healing TypeScript compiler feedback loop (`npx tsc --noEmit`) and Meta WhatsApp notifications.
+- [ ] **v3.0**: Multi-agent collaborative swarms (Planner + Coder + Reviewer).
+- [ ] **v3.2**: Voice-driven mobile intent capture and offline audio transcription.
+- [ ] **v3.5**: Native iOS & Android companion apps via Expo / Capacitor.
+
+---
+
+## 🤝 Contributing to WayCode
+
+We welcome contributions from the open-source community!
+
+1. **Fork the Repository**: Click `Fork` on GitHub.
+2. **Create a Feature Branch**: `git checkout -b feature/amazing-feature`
+3. **Commit Your Changes**: Follow [Conventional Commits](https://www.conventionalcommits.org/) (`feat: add new LLM provider adapter`).
+4. **Verify Quality**: Run `npm test` and `npx tsc --noEmit` before pushing.
+5. **Open a Pull Request**: Submit a PR to `main` with a clear summary of your changes.
+
+---
+
+## 📄 License & Attribution
+
+WayCode is open-source software licensed under the [MIT License](LICENSE).
+
+<div align="center">
+  <sub>Built with ❤️ by <a href="https://github.com/Aswinsaipalakonda">Aswin Sai Palakonda</a> and the open-source community.</sub>
+</div>
