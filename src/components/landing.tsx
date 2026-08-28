@@ -1386,29 +1386,29 @@ export function Landing() {
                       </svg>
                     ),
                     items: [
-                      { name: 'Next.js', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/nextjs/nextjs-original.svg', invert: true },
+                      { name: 'Next.js 16', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/nextjs/nextjs-original.svg', invert: true },
+                      { name: 'TypeScript', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/typescript/typescript-original.svg' },
                       { name: 'Tailwind CSS', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/tailwindcss/tailwindcss-original.svg' },
-                      { name: 'PWA App', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/chrome/chrome-original.svg' },
                     ],
                   },
                   {
-                    cat: 'Gateway',
+                    cat: 'Database & Auth',
                     color: 'text-purple-400',
                     hoverBorder: 'hover:border-purple-500/50',
                     iconBg: 'bg-purple-500/10 border-purple-500/20 text-purple-400',
                     catIcon: (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
                       </svg>
                     ),
                     items: [
-                      { name: 'Node.js', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/nodejs/nodejs-original.svg' },
-                      { name: 'REST API', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/fastapi/fastapi-original.svg' },
-                      { name: 'WebSocket', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/socketio/socketio-original.svg', whiteBg: true },
+                      { name: 'Supabase BaaS', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/supabase/supabase-original.svg' },
+                      { name: 'PostgreSQL', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/postgresql/postgresql-original.svg' },
+                      { name: 'GitHub OAuth', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/github/github-original.svg', whiteBg: true },
                     ],
                   },
                   {
-                    cat: 'Infrastructure',
+                    cat: 'Queue & Runtime',
                     color: 'text-emerald-400',
                     hoverBorder: 'hover:border-emerald-500/50',
                     iconBg: 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400',
@@ -1419,12 +1419,12 @@ export function Landing() {
                     ),
                     items: [
                       { name: 'Redis Queue', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/redis/redis-original.svg' },
-                      { name: 'Nginx Proxy', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/nginx/nginx-original.svg' },
-                      { name: 'PM2 Process', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/docker/docker-original.svg' },
+                      { name: 'Node.js Daemon', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/nodejs/nodejs-original.svg' },
+                      { name: 'Docker Sandbox', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/docker/docker-original.svg' },
                     ],
                   },
                   {
-                    cat: 'Intelligence',
+                    cat: 'AI BYOK Core',
                     color: 'text-amber-400',
                     hoverBorder: 'hover:border-amber-500/50',
                     iconBg: 'bg-amber-500/10 border-amber-500/20 text-amber-400',
@@ -1434,13 +1434,13 @@ export function Landing() {
                       </svg>
                     ),
                     items: [
-                      { name: 'LLM API', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/python/python-original.svg' },
-                      { name: 'Agent Runtime', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/wasm/wasm-original.svg' },
-                      { name: 'Tool Execution', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/linux/linux-original.svg' },
+                      { name: 'OpenRouter AI', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/openai/openai-original.svg', whiteBg: true },
+                      { name: 'Google Gemini', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/google/google-original.svg' },
+                      { name: 'Anthropic Claude', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/python/python-original.svg' },
                     ],
                   },
                   {
-                    cat: 'DevOps',
+                    cat: 'DevOps & Alerts',
                     color: 'text-rose-400',
                     hoverBorder: 'hover:border-rose-500/50',
                     iconBg: 'bg-rose-500/10 border-rose-500/20 text-rose-400',
@@ -1450,9 +1450,9 @@ export function Landing() {
                       </svg>
                     ),
                     items: [
-                      { name: 'Git SCM', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/git/git-original.svg' },
-                      { name: 'GitHub', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/github/github-original.svg', whiteBg: true },
-                      { name: 'CI/CD Actions', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/githubactions/githubactions-original.svg' },
+                      { name: 'Git Engine', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/git/git-original.svg' },
+                      { name: 'Vercel CI/CD', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/vercel/vercel-original.svg', invert: true },
+                      { name: 'WhatsApp Alerts', icon: 'https://cdn.jsdelivr.net/gh/devicons/devicon@latest/icons/fastapi/fastapi-original.svg' },
                     ],
                   },
                 ] as Array<{
