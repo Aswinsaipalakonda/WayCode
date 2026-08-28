@@ -122,52 +122,11 @@ erDiagram
 
 ## ⚙️ How It Works: The 9-Stage Autonomous Lifecycle
 
-WayCode decouples the mobile client from the execution runtime through a multi-stage distributed pipeline:
+WayCode completely decouples the mobile client from the execution runtime through a persistent, 9-stage asynchronous pipeline:
 
-```mermaid
-sequenceDiagram
-    autonumber
-    actor Dev as 📱 Developer (Mobile)
-    participant UI as ⚡ WayCode Next.js App
-    participant Redis as 🔄 Redis Queue
-    participant Daemon as 🤖 Node.js VPS Daemon
-    participant LLM as 🧠 LLM / OpenRouter API
-    participant Git as 📦 GitHub & Vercel
-    participant Meta as 💬 WhatsApp Cloud API
-
-    Dev->>UI: Submit Natural Language Intent
-    UI->>Redis: Enqueue Job (HTTP 202 Accepted)
-    UI-->>Dev: Return Instant Task ID & Realtime Channel
-    Redis->>Daemon: Dequeue Task for Worker
-    Daemon->>Git: Clone repo & checkout ephemeral branch
-    Daemon->>LLM: Ingest Context + Generate Code Plan & Edits
-    LLM-->>Daemon: Return Tool Calls & File Changes
-    Daemon->>Daemon: Apply diff & run `npx tsc --noEmit`
-    alt Self-Healing Required
-        Daemon->>LLM: Feed compiler errors for auto-repair
-        LLM-->>Daemon: Patched code modification
-    end
-    Daemon->>UI: Stream live logs & Git diff via Supabase Realtime
-    UI-->>Dev: Notify "Approval Gate Ready" on Mobile
-    Dev->>UI: Tap "Approve & Push to Production"
-    UI->>Daemon: Trigger push confirmation
-    Daemon->>Git: Git Push & Trigger Vercel Deploy Hook
-    Git-->>Daemon: Vercel Preview URL generated
-    Daemon->>Meta: Send WhatsApp message with preview URL
-    Meta-->>Dev: Direct WhatsApp alert with live test link
-```
-
-### Detailed Lifecycle Stages
-
-1. **Intent Ingestion & Parsing**: The developer inputs a task (*"Add WhatsApp webhook verification in `/api/whatsapp`"*) from their mobile browser or PWA.
-2. **GitHub PKCE OAuth Authentication**: GitHub OAuth verifies identity and ensures token permissions are scoped exclusively to user-selected repositories.
-3. **Asynchronous Redis Queue Dispatch**: The server enqueues the job into Redis with an instant `HTTP 202 Accepted` response. If mobile connection drops, the cloud job executes unimpeded.
-4. **Agent Reasoning & LLM Tool Execution**: The cloud worker prompts the selected model (Gemini, Claude, DeepSeek) with system prompt context, AST file tools (`view_file`, `replace_file_content`, `run_command`).
-5. **Isolated Workspace Sandbox**: Files are manipulated inside an ephemeral sandboxed directory with git version history preserved.
-6. **Self-Healing Compiler Feedback Loop**: The daemon executes automated type checking and linting (`npx tsc --noEmit`). Any compiler errors are fed back into the LLM context for bounded auto-correction before human review.
-7. **Safe Mobile Diff Review & Approval Gate**: The developer reviews interactive additions (`#10B981`) and deletions (`#EF4444`) on their phone and provides an explicit **Approval** or **Rejection with Feedback**.
-8. **Production Git Push & Vercel Trigger**: Upon approval, the daemon commits and pushes the branch to GitHub, triggering CI/CD preview deployments via Vercel Deploy Webhooks.
-9. **Out-of-Band Realtime Push Notification**: An instant Meta WhatsApp Cloud API alert arrives on the developer's mobile device with the live preview URL.
+<div align="center">
+  <img src="public/images/workfloww.png" alt="WayCode 9-Stage Autonomous Lifecycle Workflow" style="max-width: 100%; width: 100%; height: auto; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.12);" />
+</div>
 
 ---
 
