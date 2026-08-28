@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <!-- Glowing Blue Path 'W' Monogram -->
+  <path d="M20 30L38 72L50 44L62 72L80 30" stroke="#0071e3" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Left Code Bracket < in White -->
+  <path d="M28 44L14 50L28 56" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Right Code Bracket > in White -->
+  <path d="M72 44L86 50L72 56" stroke="#ffffff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
