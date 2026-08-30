@@ -19,7 +19,26 @@ import {
   Check,
   Cpu,
   ThumbsDown,
+  Sparkles,
+  ChevronDown,
 } from 'lucide-react'
+
+function formatModelDisplay(modelId: string): string {
+  if (!modelId) return 'Gemini 2.0 Flash'
+  if (modelId.includes('gemini-2.0-flash')) return 'Gemini 2.0 Flash'
+  if (modelId.includes('gemini-1.5-pro')) return 'Gemini 1.5 Pro'
+  if (modelId.includes('gemini-1.5-flash')) return 'Gemini 1.5 Flash'
+  if (modelId.includes('gemma-4-31b')) return 'Gemma 4 31B'
+  if (modelId.includes('gemma-4-26b')) return 'Gemma 4 26B'
+  if (modelId.includes('llama-3.3-70b')) return 'Llama 3.3 70B'
+  if (modelId.includes('qwen-2.5-coder')) return 'Qwen 2.5 Coder'
+  if (modelId.includes('deepseek-r1')) return 'DeepSeek R1'
+  if (modelId.includes('north-mini-code')) return 'Cohere North'
+  if (modelId.includes('claude-3-5-sonnet')) return 'Claude 3.5 Sonnet'
+  if (modelId.includes('claude-3-5-haiku')) return 'Claude 3.5 Haiku'
+  const name = modelId.split('/').pop()?.replace(':free', '') || modelId
+  return name.length > 20 ? name.slice(0, 18) + '…' : name
+}
 import { TelemetryStreamer } from '@/components/telemetry-streamer'
 import { DiffReviewModal } from '@/components/diff-review-modal'
 import { useAppChrome } from '@/components/app-chrome'
@@ -109,7 +128,7 @@ export function ConversationChat({ conversation }: { conversation: ConversationR
 }
 
 function ChatThread({ conversation }: { conversation?: ConversationRef }) {
-  const { user, selectedRepo, repositories, openRepoPicker, onSelectRepo } = useAppChrome()
+  const { user, selectedRepo, repositories, openRepoPicker, onSelectRepo, openSettings } = useAppChrome()
   const router = useRouter()
 
   const [messages, setMessages] = useState<ThreadMessage[]>([])
@@ -119,8 +138,34 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
   const [showAttachments, setShowAttachments] = useState(false)
   const [contextDraft, setContextDraft] = useState<ContextDraft>(EMPTY_CONTEXT)
   const [hasWhatsApp, setHasWhatsApp] = useState<boolean | null>(null)
+  const [activeModel, setActiveModel] = useState<string>('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    let ignore = false
+    fetch('/api/settings/load')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!ignore && data.success && data.model) {
+          setActiveModel(data.model)
+        }
+      })
+      .catch(() => {})
+
+    const handleModelUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ model?: string }>
+      if (customEvent.detail?.model) {
+        setActiveModel(customEvent.detail.model)
+      }
+    }
+
+    window.addEventListener('waycode:model-updated', handleModelUpdate)
+    return () => {
+      ignore = true
+      window.removeEventListener('waycode:model-updated', handleModelUpdate)
+    }
+  }, [])
 
   useEffect(() => {
     if (!user) return
@@ -687,18 +732,34 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
                 <Paperclip className="h-[18px] w-[18px]" />
               </button>
 
-              <button
-                type="submit"
-                disabled={!prompt.trim()}
-                aria-label="Send"
-                className="pressable flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] text-white shadow-[0_4px_16px_-4px_var(--brand-glow)] transition-all duration-200 hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:shadow-none"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <ArrowUp className="h-4 w-4" strokeWidth={2.6} />
-                )}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* Active Model Selector Pill — displays chosen model & opens settings on tap */}
+                <button
+                  type="button"
+                  onClick={openSettings}
+                  title="Change AI model in settings"
+                  className="group flex items-center gap-1.5 rounded-full border border-[var(--border-strong)] bg-[var(--surface)] px-2.5 py-1 text-xs font-semibold text-[var(--foreground-secondary)] shadow-xs transition-all hover:border-[var(--brand)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)] active:scale-95"
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-[var(--brand)] transition-transform duration-300 group-hover:scale-110" />
+                  <span className="max-w-[120px] truncate font-mono-code text-[11px] font-medium sm:max-w-[190px]">
+                    {formatModelDisplay(activeModel)}
+                  </span>
+                  <ChevronDown className="h-3 w-3 opacity-50 transition-transform duration-200 group-hover:translate-y-0.5" />
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={!prompt.trim()}
+                  aria-label="Send"
+                  className="pressable flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)] text-white shadow-[0_4px_16px_-4px_var(--brand-glow)] transition-all duration-200 hover:brightness-110 active:scale-95 disabled:opacity-40 disabled:shadow-none"
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <ArrowUp className="h-4 w-4" strokeWidth={2.6} />
+                  )}
+                </button>
+              </div>
             </div>
           </form>
         </motion.div>

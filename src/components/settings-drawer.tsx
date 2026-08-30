@@ -305,6 +305,9 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
     }
   }, [])
 
+  const isOpenRef = useRef(false)
+  const userHasSelectedRef = useRef(false)
+
   const loadVaultModels = useCallback(async (targetProvider?: Provider, preferredModel?: string) => {
     setLoadingModels(true)
     setModelsError(null)
@@ -321,20 +324,28 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
         setCatalog(list)
         setCatalogMeta({ total: data.total ?? list.length, free: data.free ?? 0 })
         setModelsError(null)
+        
+        // If the user already explicitly selected a model during this session, NEVER overwrite it!
+        if (userHasSelectedRef.current) {
+          return
+        }
+
         const targetModel = preferredModel || model
         if (targetModel && list.some((m) => m.id === targetModel)) {
           setModel(targetModel)
         } else if (list.length > 0) {
-          // If preferred model was retired by provider (e.g. nvidia 404), pick Gemini 2.0 Flash or first free model
+          // If preferred model was retired by provider, pick top free model
           const fallback =
+            list.find((m) => m.id === 'google/gemma-4-31b-it:free') ||
             list.find((m) => m.id === 'google/gemini-2.0-flash-exp:free') ||
+            list.find((m) => m.id.includes('gemini')) ||
             list.find((m) => m.free) ||
             list[0]
           if (fallback) {
             setModel(fallback.id)
             if (targetModel && targetModel !== fallback.id) {
               toast.info('Model updated', {
-                description: `Previous model was retired by provider. Switched to ${fallback.name}.`,
+                description: `Previous model was retired by provider. Selected ${fallback.name}.`,
               })
             }
           }
@@ -347,15 +358,14 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
     } finally {
       setLoadingModels(false)
     }
-  }, [provider])
-
-  const isOpenRef = useRef(false)
+  }, [provider, model])
 
   // Every open restores the persisted vault — provider, model, and proof of
   // the stored key (masked). The key stays encrypted server-side forever.
   useEffect(() => {
     if (!isOpen) {
       isOpenRef.current = false
+      userHasSelectedRef.current = false
       return
     }
     if (isOpenRef.current) return
@@ -397,6 +407,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
   }, [isOpen, fetchVault, loadVaultModels])
 
   const handleSelectModel = (newModelId: string) => {
+    userHasSelectedRef.current = true
     setModel(newModelId)
     toast.success('Model selected', {
       description: `${newModelId.split('/').pop()?.replace(':free', '') || newModelId} active. Click "Save & Route Tasks" to apply.`,
@@ -567,6 +578,9 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
           if (fresh.hasKey && fresh.lastTestStatus === 'connected') {
             setStatusMsg(`${PROVIDERS.find((p) => p.id === fresh.provider)?.label ?? fresh.provider} vault restored`)
           }
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('waycode:model-updated', { detail: { model, provider } }))
         }
         onClose()
       } else {
