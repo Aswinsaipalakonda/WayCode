@@ -425,7 +425,7 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
   return (
     <div className="flex h-full flex-col">
       {/* ---------- Thread ---------- */}
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto smooth-scroll-container">
         {!hasThread && hydrating ? (
           /* Restoring the persisted thread */
           <div className="flex min-h-full items-center justify-center">

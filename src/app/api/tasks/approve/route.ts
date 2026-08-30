@@ -137,7 +137,7 @@ export async function POST(request: Request) {
       })
     }
 
-    await supabase
+    const { error: updateJobError } = await admin
       .from('task_jobs')
       .update({
         status: 'completed',
@@ -146,6 +146,10 @@ export async function POST(request: Request) {
         updated_at: new Date().toISOString(),
       })
       .eq('id', taskId)
+
+    if (updateJobError) {
+      console.error('[Approve Task] Failed to update task_jobs status:', updateJobError)
+    }
 
     await supabase.from('task_logs').insert({
       task_id: taskId,

@@ -513,8 +513,22 @@ export function DiffReviewModal({
               )}
             </AnimatePresence>
 
-            {/* Footer actions — hidden once a decision has been made */}
-            {!decision && (
+            {/* Footer actions */}
+            {decision || result ? (
+              <div className="flex items-center justify-between border-t border-[var(--border)] bg-[var(--surface)] px-5 py-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))]">
+                <div className="flex items-center gap-2 text-xs font-semibold text-[var(--success)]">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span>Changes approved & pushed to GitHub</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="pressable rounded-full border border-[var(--border-strong)] bg-[var(--card)] px-5 py-2 text-xs font-bold text-[var(--foreground)] shadow-xs hover:border-[var(--brand)]"
+                >
+                  Close
+                </button>
+              </div>
+            ) : (
               <div className="border-t border-[var(--border)] p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 {showRejectPanel ? (
                   <div className="flex gap-2.5">
