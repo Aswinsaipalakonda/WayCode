@@ -34,20 +34,27 @@ export function WhatsAppOnboardingModal({ user }: WhatsAppOnboardingModalProps) 
   useEffect(() => {
     if (!user || !user.id || typeof window === 'undefined') return
 
-    const storageKey = `waycode_whatsapp_prompted_${user.id}`
-    const alreadyPrompted = localStorage.getItem(storageKey)
-    if (alreadyPrompted) return
-
     let cancelled = false
 
     fetch('/api/settings/whatsapp')
       .then((res) => res.json())
       .then((data) => {
         if (cancelled) return
-        if (data.success && data.whatsappNumber) {
-          localStorage.setItem(storageKey, 'configured')
-        } else {
-          setIsOpen(true)
+        const hasNumber = Boolean(data.success && data.whatsappNumber)
+        
+        // Broadcast the initial resolved state so other components stay in sync
+        window.dispatchEvent(
+          new CustomEvent('waycode:whatsapp-updated', {
+            detail: { whatsappNumber: data.whatsappNumber || null },
+          })
+        )
+
+        // If the user has not connected WhatsApp, prompt them on login
+        if (!hasNumber) {
+          const sessionDismissed = sessionStorage.getItem(`waycode_wa_dismissed_${user.id}`)
+          if (!sessionDismissed) {
+            setIsOpen(true)
+          }
         }
       })
       .catch(() => {})
@@ -59,7 +66,7 @@ export function WhatsAppOnboardingModal({ user }: WhatsAppOnboardingModalProps) 
 
   const handleDismiss = () => {
     if (user?.id) {
-      localStorage.setItem(`waycode_whatsapp_prompted_${user.id}`, 'dismissed')
+      sessionStorage.setItem(`waycode_wa_dismissed_${user.id}`, 'true')
     }
     setIsOpen(false)
   }
@@ -91,8 +98,13 @@ export function WhatsAppOnboardingModal({ user }: WhatsAppOnboardingModalProps) 
 
       if (res.ok && data.success) {
         if (user?.id) {
-          localStorage.setItem(`waycode_whatsapp_prompted_${user.id}`, 'configured')
+          sessionStorage.removeItem(`waycode_wa_dismissed_${user.id}`)
         }
+        window.dispatchEvent(
+          new CustomEvent('waycode:whatsapp-updated', {
+            detail: { whatsappNumber: data.whatsappNumber || fullNumber },
+          })
+        )
         setIsOpen(false)
         toast.success('WhatsApp alerts connected!', {
           description: `Live preview links will be sent to +91 ${formattedDisplay}`,
@@ -189,40 +201,43 @@ export function WhatsAppOnboardingModal({ user }: WhatsAppOnboardingModalProps) 
             </motion.div>
 
             {/* Form */}
-            <form onSubmit={handleSave} className="mt-4 sm:mt-5 space-y-3.5">
+            <form onSubmit={handleSave} noValidate className="mt-4 sm:mt-5 space-y-4">
               <div>
-                <label className="mb-1.5 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-[#64748b]">
-                  <span>Mobile Number</span>
-                  <span className="font-normal lowercase tracking-normal text-[10.5px] text-[#94a3b8]">
+                <div className="mb-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <span>WhatsApp Mobile Number</span>
+                  <span className={`font-mono-code text-[11px] font-semibold lowercase tracking-normal transition-colors ${digits.length === 10 ? 'text-[#10b981]' : 'text-slate-400'}`}>
                     {digits.length}/10 digits
                   </span>
-                </label>
+                </div>
 
-                {/* Input Box with perfect alignment and zero default browser focus border */}
-                <div className="relative flex h-12 w-full items-center rounded-2xl border border-[#cbd5e1] bg-white px-2.5 sm:px-3 shadow-xs transition-all focus-within:border-[#25D366] focus-within:ring-4 focus-within:ring-[#25D366]/15">
+                {/* Crispy Modern Input Container */}
+                <div className="relative flex h-13 w-full items-center rounded-2xl border border-slate-200/90 bg-slate-50/60 p-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 focus-within:border-[#25D366] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#25D366]/12">
                   {/* Fixed Country Pill */}
-                  <div className="flex h-7 shrink-0 items-center gap-1.5 rounded-xl bg-[#f1f5f9] px-2.5 text-xs font-bold text-[#0f172a] select-none">
-                    <span className="text-[13px]">🇮🇳</span>
-                    <span>+91</span>
+                  <div className="flex h-10 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-3 shadow-xs select-none">
+                    <span className="text-[14px]">🇮🇳</span>
+                    <span className="font-mono-code text-[13px] font-bold text-slate-800">+91</span>
                   </div>
 
-                  {/* 10 Digit Number Input — Completely borderless/outline-free inside container */}
+                  {/* 10 Digit Number Input — Clean & Borderless */}
                   <input
                     type="tel"
                     inputMode="numeric"
-                    pattern="[0-9]*"
                     value={formattedDisplay}
                     onChange={(e) => handleDigitsChange(e.target.value)}
                     placeholder="98765 43210"
                     maxLength={11}
-                    className="h-full min-w-0 flex-1 border-0 bg-transparent px-2.5 font-mono-code text-[14.5px] sm:text-[15px] font-semibold text-[#0f172a] placeholder:font-normal placeholder:text-[#94a3b8]/70 focus:border-0 focus:outline-none focus:ring-0 outline-none ring-0"
+                    className="h-full min-w-0 flex-1 border-0 bg-transparent px-3 font-mono-code text-[15.5px] font-semibold tracking-wider text-slate-900 placeholder:font-sans placeholder:text-[14px] placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400 outline-none focus:outline-none focus:ring-0 [outline:none] focus:[outline:none]"
                     autoFocus
                   />
 
                   {digits.length === 10 && (
-                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#10b981] text-white">
-                      <TbCheck className="h-3 w-3 stroke-[3]" />
-                    </span>
+                    <motion.span
+                      initial={{ scale: 0.8, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="mr-1.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#10b981] text-white shadow-xs"
+                    >
+                      <TbCheck className="h-3.5 w-3.5 stroke-[3]" />
+                    </motion.span>
                   )}
                 </div>
               </div>

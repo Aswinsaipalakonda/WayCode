@@ -24,6 +24,7 @@ import { TelemetryStreamer } from '@/components/telemetry-streamer'
 import { DiffReviewModal } from '@/components/diff-review-modal'
 import { useAppChrome } from '@/components/app-chrome'
 import { openWhatsAppModal } from '@/components/whatsapp-onboarding-modal'
+import { TbBrandWhatsapp } from 'react-icons/tb'
 
 interface ThreadMessage {
   id: string
@@ -117,8 +118,36 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showAttachments, setShowAttachments] = useState(false)
   const [contextDraft, setContextDraft] = useState<ContextDraft>(EMPTY_CONTEXT)
+  const [hasWhatsApp, setHasWhatsApp] = useState<boolean | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => {
+    if (!user) return
+
+    let cancelled = false
+    fetch('/api/settings/whatsapp')
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled && data.success) {
+          setHasWhatsApp(Boolean(data.whatsappNumber))
+        }
+      })
+      .catch(() => {})
+
+    const handleUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ whatsappNumber?: string | null }>
+      if (customEvent.detail && typeof customEvent.detail.whatsappNumber !== 'undefined') {
+        setHasWhatsApp(Boolean(customEvent.detail.whatsappNumber))
+      }
+    }
+
+    window.addEventListener('waycode:whatsapp-updated', handleUpdate)
+    return () => {
+      cancelled = true
+      window.removeEventListener('waycode:whatsapp-updated', handleUpdate)
+    }
+  }, [user])
 
   const scrollToBottom = useCallback((smooth = true) => {
     requestAnimationFrame(() => {
@@ -236,6 +265,14 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
   const handleSubmit = async () => {
     const text = prompt.trim()
     if (isSubmitting || !text || !user) return
+
+    if (hasWhatsApp === false) {
+      openWhatsAppModal()
+      toast.info('WhatsApp number required', {
+        description: 'Connect your WhatsApp number to receive deployment alerts before starting tasks.',
+      })
+      return
+    }
 
     if (!selectedRepo) {
       toast('Pick a repository first', { description: 'Choose where this task should run.' })
@@ -487,43 +524,56 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
             }}
             className="rounded-[28px] border border-white/70 bg-white/75 p-3 shadow-[var(--shadow-composer)] backdrop-blur-xl transition-shadow duration-300 focus-within:border-white focus-within:shadow-[0_18px_54px_-18px_rgba(10,102,255,0.35),0_2px_10px_-3px_rgba(26,30,40,0.08)]"
           >
-            {/* Repository chip */}
-            <div className="mb-2 flex items-center gap-0.5">
-              <button
-                type="button"
-                onClick={openRepoPicker}
-                aria-label="Choose repository"
-                className={`pressable inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
-                  selectedRepo
-                    ? 'border-transparent bg-[var(--brand-soft)] text-[var(--brand)]'
-                    : 'border-dashed border-black/15 text-[var(--muted-foreground)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
-                }`}
-              >
-                <Image src="/logo.png" alt="" width={13} height={13} />
-                <span className="truncate">
-                  {selectedRepo
-                    ? selectedRepo.repo_name.split('/')[1] || selectedRepo.repo_name
-                    : 'Select repository'}
-                </span>
-                {selectedRepo && (
-                  <span className="hidden items-center gap-1 font-mono-code text-[9.5px] font-medium normal-case text-[var(--muted-foreground)] xs:inline-flex">
-                    <GitBranch className="h-2.5 w-2.5" />
-                    {selectedRepo.default_branch || 'main'}
-                  </span>
-                )}
-              </button>
-              {selectedRepo && (
+            {/* Repository chip & WhatsApp alert status */}
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
+              <div className="flex min-w-0 items-center gap-0.5">
                 <button
                   type="button"
-                  onClick={() => {
-                    onSelectRepo(null)
-                    toast('Repository removed', { description: 'Tasks need a repository — pick one to continue.' })
-                  }}
-                  aria-label="Remove repository"
-                  title="Remove repository"
-                  className="pressable rounded-full p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--error-soft)] hover:text-[var(--error)]"
+                  onClick={openRepoPicker}
+                  aria-label="Choose repository"
+                  className={`pressable inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold ${
+                    selectedRepo
+                      ? 'border-transparent bg-[var(--brand-soft)] text-[var(--brand)]'
+                      : 'border-dashed border-black/15 text-[var(--muted-foreground)] hover:border-[var(--brand)] hover:text-[var(--brand)]'
+                  }`}
                 >
-                  <X className="h-3.5 w-3.5" />
+                  <Image src="/logo.png" alt="" width={13} height={13} />
+                  <span className="truncate">
+                    {selectedRepo
+                      ? selectedRepo.repo_name.split('/')[1] || selectedRepo.repo_name
+                      : 'Select repository'}
+                  </span>
+                  {selectedRepo && (
+                    <span className="hidden items-center gap-1 font-mono-code text-[9.5px] font-medium normal-case text-[var(--muted-foreground)] xs:inline-flex">
+                      <GitBranch className="h-2.5 w-2.5" />
+                      {selectedRepo.default_branch || 'main'}
+                    </span>
+                  )}
+                </button>
+                {selectedRepo && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelectRepo(null)
+                      toast('Repository removed', { description: 'Tasks need a repository — pick one to continue.' })
+                    }}
+                    aria-label="Remove repository"
+                    title="Remove repository"
+                    className="pressable rounded-full p-1.5 text-[var(--muted-foreground)] hover:bg-[var(--error-soft)] hover:text-[var(--error)]"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {hasWhatsApp === false && (
+                <button
+                  type="button"
+                  onClick={openWhatsAppModal}
+                  className="pressable inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-[11px] font-bold text-amber-700 shadow-xs transition-all hover:bg-amber-500/20 active:scale-95"
+                >
+                  <TbBrandWhatsapp className="h-3.5 w-3.5 text-[#128C7E]" />
+                  <span>WhatsApp Required to Run Tasks</span>
                 </button>
               )}
             </div>

@@ -12,6 +12,19 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
   const [fetching, setFetching] = useState(initialNumber === undefined)
 
   useEffect(() => {
+    const handleUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ whatsappNumber?: string | null }>
+      if (customEvent.detail && typeof customEvent.detail.whatsappNumber !== 'undefined') {
+        setNumber(customEvent.detail.whatsappNumber)
+      }
+    }
+    window.addEventListener('waycode:whatsapp-updated', handleUpdate)
+    return () => {
+      window.removeEventListener('waycode:whatsapp-updated', handleUpdate)
+    }
+  }, [])
+
+  useEffect(() => {
     if (initialNumber !== undefined) return
 
     let cancelled = false
@@ -72,8 +85,14 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
       const data = await res.json()
 
       if (res.ok && data.success) {
-        setNumber(data.whatsappNumber)
+        const savedNumber = data.whatsappNumber || fullNumber
+        setNumber(savedNumber)
         setIsEditing(false)
+        window.dispatchEvent(
+          new CustomEvent('waycode:whatsapp-updated', {
+            detail: { whatsappNumber: savedNumber },
+          })
+        )
         toast.success('WhatsApp number saved', {
           description: `Connected to +91 ${formattedDisplay}`,
         })
@@ -101,6 +120,11 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
         setNumber(null)
         setIsEditing(false)
         setDigits('')
+        window.dispatchEvent(
+          new CustomEvent('waycode:whatsapp-updated', {
+            detail: { whatsappNumber: null },
+          })
+        )
         toast.success('WhatsApp notifications removed')
       } else {
         toast.error('Failed to remove WhatsApp number')
@@ -132,12 +156,24 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
               <TbBrandWhatsapp className="h-4 w-4" />
             </span>
             <span className="min-w-0">
-              WhatsApp alerts
+              <span className="flex items-center gap-2">
+                WhatsApp alerts
+                {number ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#10b981]/10 px-2 py-0.5 text-[9.5px] font-bold text-[#10b981]">
+                    <TbCheck className="h-3 w-3 stroke-[2.5]" />
+                    Tasks Enabled
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[9.5px] font-bold text-amber-600">
+                    Required for Tasks
+                  </span>
+                )}
+              </span>
               <span className="block text-[10.5px] font-medium text-[var(--muted-foreground)]">
                 {number ? (
                   <span className="font-mono-code font-semibold text-[#111827]">{number}</span>
                 ) : (
-                  'Deploy receipts & preview URLs'
+                  'Connect to receive live deploy receipts & enable task creation'
                 )}
               </span>
             </span>
@@ -191,23 +227,27 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
             </button>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <div className="flex h-11 flex-1 items-center rounded-xl border border-[#cbd5e1] bg-white px-2.5 transition-all focus-within:border-[#25D366] focus-within:ring-4 focus-within:ring-[#25D366]/15">
-              <div className="flex h-7 shrink-0 items-center gap-1 rounded-lg bg-[#f1f5f9] px-2 text-xs font-bold text-[#0f172a] select-none">
-                <span>🇮🇳</span>
-                <span>+91</span>
+          <div className="flex flex-col gap-2.5 sm:flex-row">
+            <div className="relative flex h-12 flex-1 items-center rounded-2xl border border-slate-200/90 bg-slate-50/60 p-1 shadow-xs transition-all duration-200 focus-within:border-[#25D366] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#25D366]/12">
+              <div className="flex h-9 shrink-0 items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white px-2.5 shadow-xs select-none">
+                <span className="text-[13px]">🇮🇳</span>
+                <span className="font-mono-code text-[12.5px] font-bold text-slate-800">+91</span>
               </div>
               <input
                 type="tel"
                 inputMode="numeric"
-                pattern="[0-9]*"
                 value={formattedDisplay}
                 onChange={(e) => handleDigitsChange(e.target.value)}
                 placeholder="98765 43210"
                 maxLength={11}
-                className="h-full min-w-0 flex-1 border-0 bg-transparent px-2.5 font-mono-code text-[14px] font-semibold text-[#0f172a] placeholder:font-normal placeholder:text-[#94a3b8]/70 focus:border-0 focus:outline-none focus:ring-0 outline-none ring-0"
+                className="h-full min-w-0 flex-1 border-0 bg-transparent px-2.5 font-mono-code text-[14.5px] font-semibold tracking-wider text-slate-900 placeholder:font-sans placeholder:text-[13.5px] placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400 outline-none focus:outline-none focus:ring-0 [outline:none] focus:[outline:none]"
                 autoFocus
               />
+              {digits.length === 10 && (
+                <span className="mr-1.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#10b981] text-white shadow-xs">
+                  <TbCheck className="h-3 w-3 stroke-[3]" />
+                </span>
+              )}
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
@@ -215,7 +255,7 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
                 type="button"
                 onClick={handleSave}
                 disabled={loading || digits.length !== 10}
-                className="pressable inline-flex h-11 items-center gap-1.5 rounded-xl bg-[#25D366] px-4 text-xs font-bold text-white shadow-xs hover:bg-[#20bd5a] disabled:opacity-40 disabled:cursor-not-allowed"
+                className="pressable inline-flex h-12 items-center gap-1.5 rounded-2xl bg-[#25D366] px-4 text-xs font-bold text-white shadow-xs hover:bg-[#20bd5a] disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <TbLoaderQuarter className="h-3.5 w-3.5 animate-spin" />
@@ -228,14 +268,14 @@ export function WhatsAppSettings({ initialNumber }: { initialNumber?: string | n
                 type="button"
                 onClick={handleCancel}
                 disabled={loading}
-                className="pressable flex h-11 items-center rounded-xl border border-black/10 bg-white px-3 text-xs font-semibold text-[var(--muted-foreground)] hover:bg-black/5 hover:text-[#111827]"
+                className="pressable flex h-12 items-center rounded-2xl border border-black/10 bg-white px-3 text-xs font-semibold text-[var(--muted-foreground)] hover:bg-black/5 hover:text-[#111827]"
               >
                 Cancel
               </button>
             </div>
           </div>
           <p className="text-[10.5px] text-[var(--muted-foreground)]">
-            Only 10-digit numbers for automated deploy receipts.
+            Only 10-digit mobile numbers for automated deployment receipts and previews.
           </p>
         </div>
       )}
