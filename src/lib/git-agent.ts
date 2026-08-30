@@ -136,7 +136,7 @@ export async function landApprovedDiff(opts: LandOptions): Promise<{ pushedBranc
   await runGit(['config', 'user.email', 'agent@waycode.dev'], opts.dest)
   await runGit(['add', '-A'], opts.dest)
   await runGit(['commit', '-m', opts.commitMessage], opts.dest)
-  await runGit(['push', '-u', 'origin', `HEAD:refs/heads/${opts.branchName}`], opts.dest)
+  await runGit(['push', '-u', '--force', 'origin', `HEAD:refs/heads/${opts.branchName}`], opts.dest)
 
   return { pushedBranch: opts.branchName, sandboxDir: opts.dest }
 }

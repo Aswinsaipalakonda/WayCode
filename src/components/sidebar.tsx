@@ -109,7 +109,7 @@ export function Sidebar({ onNavigate }: SidebarProps) {
           </button>
         </div>
 
-        <div className="max-h-full space-y-0.5 overflow-y-auto pr-0.5 pb-1">
+        <div className="max-h-full space-y-0.5 overflow-y-auto smooth-scroll-container pr-0.5 pb-1">
           {repositories.length === 0 ? (
             <p className="anim-fade-in px-2 py-4 text-center text-xs leading-relaxed text-[var(--chrome-text-muted)]">
               Connect a repository to start dispatching tasks.

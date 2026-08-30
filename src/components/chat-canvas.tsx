@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AnimatePresence, motion } from 'motion/react'
 import { toast } from 'sonner'
+import Lenis from 'lenis'
 import {
   ArrowUp,
   Paperclip,
@@ -195,11 +196,48 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
     }
   }, [user])
 
+  const lenisRef = useRef<Lenis | null>(null)
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+
+    const lenis = new Lenis({
+      wrapper: el,
+      content: (el.firstElementChild as HTMLElement) || el,
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      orientation: 'vertical',
+      gestureOrientation: 'vertical',
+      smoothWheel: true,
+      wheelMultiplier: 1.1,
+      touchMultiplier: 1.6,
+      infinite: false,
+    })
+    lenisRef.current = lenis
+
+    function raf(time: number) {
+      lenis.raf(time)
+      requestAnimationFrame(raf)
+    }
+    const rafId = requestAnimationFrame(raf)
+
+    return () => {
+      cancelAnimationFrame(rafId)
+      lenis.destroy()
+      lenisRef.current = null
+    }
+  }, [])
+
   const scrollToBottom = useCallback((smooth = true) => {
     requestAnimationFrame(() => {
       const el = scrollRef.current
       if (!el) return
-      el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
+      if (lenisRef.current) {
+        lenisRef.current.scrollTo(el.scrollHeight, { immediate: !smooth })
+      } else {
+        el.scrollTo({ top: el.scrollHeight, behavior: smooth ? 'smooth' : 'auto' })
+      }
     })
   }, [])
 

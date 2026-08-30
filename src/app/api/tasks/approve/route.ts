@@ -43,6 +43,14 @@ export async function POST(request: Request) {
     if (job.user_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
+    if (['completed', 'success'].includes((job.status as string) || '')) {
+      return NextResponse.json({
+        success: true,
+        message: 'Job is already approved & pushed to GitHub.',
+        branch: job.branch_name,
+        alreadyCompleted: true,
+      })
+    }
     if (!['verifying', 'build_verified'].includes((job.status as string) || '')) {
       return NextResponse.json(
         { error: `Task is not reviewable in state "${job.status}"` },

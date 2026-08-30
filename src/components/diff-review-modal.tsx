@@ -357,7 +357,7 @@ export function DiffReviewModal({
             )}
 
             {/* Diff content cards */}
-            <div className="min-h-0 flex-1 overflow-y-auto bg-[#05070c] p-4 font-mono-code text-[11px] leading-[1.7]">
+            <div className="min-h-0 flex-1 overflow-y-auto smooth-scroll-container bg-[#05070c] p-4 font-mono-code text-[11px] leading-[1.7]">
               {fileDiffs.length > 0 ? (
                 <div className="space-y-5">
                   {displayedFiles.map((file) => (
