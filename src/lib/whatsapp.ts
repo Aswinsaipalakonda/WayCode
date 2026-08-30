@@ -42,9 +42,10 @@ export async function sendWhatsAppText(to: string, body: string): Promise<boolea
     return false
   }
 
-  const cleanTo = to.replace(/[^\d+]/g, '')
-  if (!cleanTo) {
-    console.warn('[WhatsApp] Invalid recipient phone number provided.')
+  // Meta WhatsApp Cloud API strictly requires digits only (country code + number, NO '+' sign)
+  const cleanTo = to.replace(/\D/g, '')
+  if (!cleanTo || cleanTo.length < 8) {
+    console.warn(`[WhatsApp] Invalid recipient phone number provided: "${to}" -> "${cleanTo}"`)
     return false
   }
 

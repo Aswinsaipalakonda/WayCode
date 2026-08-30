@@ -12,6 +12,7 @@ import {
   GitBranch,
   Loader2,
   FileCode2,
+  FileText,
   CircleAlert,
   CheckCircle2,
   X,
@@ -806,7 +807,7 @@ function TaskCard({
   const [reviewOpen, setReviewOpen] = useState(false)
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
-  // Catch up on current state, then follow live updates.
+  // Catch up on current state, then follow live updates with polling fallback.
   useEffect(() => {
     let cancelled = false
 
@@ -817,7 +818,7 @@ function TaskCard({
         .eq('id', task.taskId)
         .single()
       if (!cancelled && data) {
-        setStatus(data.status ?? 'queued')
+        if (data.status) setStatus(data.status)
         if (data.diff_content) setDiffContent(data.diff_content as string)
         setUsage({
           input: (data.input_tokens as number | null) ?? null,
@@ -827,6 +828,11 @@ function TaskCard({
       }
     }
     catchUp()
+
+    // Active polling interval while task is running or verifying
+    const pollInterval = setInterval(() => {
+      if (!cancelled) catchUp()
+    }, 2500)
 
     const channel = supabase
       .channel(`task_jobs_${task.taskId}`)
@@ -854,6 +860,7 @@ function TaskCard({
 
     return () => {
       cancelled = true
+      clearInterval(pollInterval)
       supabase.removeChannel(channel)
     }
   }, [supabase, task.taskId])
@@ -873,9 +880,9 @@ function TaskCard({
       : statusLower === 'rejected'
         ? 'Changes discarded'
         : ['completed', 'success'].includes(statusLower)
-          ? 'Finished — changes on the working branch'
+          ? 'Shipped — PR created & pushed to GitHub'
           : statusLower === 'verifying'
-            ? 'Verifying the build…'
+            ? 'Build verified — ready to review'
             : statusLower === 'processing'
               ? 'Generating changes…'
               : 'Queued for the build daemon…'
@@ -918,65 +925,72 @@ function TaskCard({
                 <span className="absolute inset-0 animate-ping rounded-full bg-[var(--brand)] opacity-20" aria-hidden />
               )}
               <span className="relative flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-black shadow-[var(--shadow-sm)]">
-                <Image src="/logo.png" alt="" width={24} height={24} className="object-contain" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-white.svg" alt="WayCode" className="h-5 w-5 object-contain" />
               </span>
             </span>
+
             <div className="min-w-0">
-              <p className="truncate text-[13.5px] font-bold leading-tight tracking-tight">WayCode Agent</p>
-              <p className="mt-0.5 flex items-center gap-1.5 truncate text-[10.5px] font-medium text-[var(--muted-foreground)]">
-                {taskActive && <span className="live-dot" style={{ width: 5, height: 5 }} />}
+              <h3 className="truncate text-sm font-bold text-[var(--foreground)]">WayCode Agent</h3>
+              <p className="flex items-center gap-1.5 text-xs text-[var(--muted-foreground)]">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    failed
+                      ? 'bg-[var(--error)]'
+                      : ['completed', 'success'].includes(statusLower)
+                        ? 'bg-[var(--success)]'
+                        : 'bg-[var(--brand)]'
+                  }`}
+                />
                 {subtitle}
               </p>
             </div>
           </div>
-          <span
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${meta.cls}`}
-          >
-            {meta.pulse && <span className="live-dot" style={{ width: 6, height: 6 }} />}
-            {meta.label.toUpperCase()}
+
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${meta.cls}`}>
+            {meta.pulse && <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />}
+            {meta.label}
           </span>
         </div>
 
-        {/* Identity chips — task id + working branch, tap to copy */}
-        <div className="flex flex-wrap items-center gap-1.5 px-4 pb-3.5">
-          <button
-            type="button"
-            onClick={() => copyText('task-id', task.taskId)}
-            title={copiedField === 'task-id' ? 'Copied!' : `Copy task ID · ${task.taskId}`}
-            className="group/chip pressable flex items-center gap-1.5 rounded-full border border-black/[0.05] bg-black/[0.03] px-2.5 py-1 font-mono-code text-[9.5px] text-[var(--muted-foreground)] transition-colors hover:border-[var(--brand)]/40 hover:text-[var(--brand)]"
-          >
-            {copiedField === 'task-id' ? (
-              <Check className="h-2.5 w-2.5 text-[var(--success)]" />
-            ) : (
-              <Copy className="h-2.5 w-2.5 opacity-50 transition-opacity group-hover/chip:opacity-100" />
-            )}
-            waycode/{task.taskId.slice(0, 12)}
-          </button>
-          {task.branchName && (
-            <button
-              type="button"
-              onClick={() => copyText('branch', task.branchName)}
-              title={copiedField === 'branch' ? 'Copied!' : 'Copy branch name'}
-              className="group/chip pressable flex items-center gap-1.5 rounded-full border border-black/[0.05] bg-black/[0.03] px-2.5 py-1 font-mono-code text-[9.5px] text-[var(--muted-foreground)] transition-colors hover:border-[var(--brand)]/40 hover:text-[var(--brand)]"
-            >
-              {copiedField === 'branch' ? (
-                <Check className="h-2.5 w-2.5 text-[var(--success)]" />
-              ) : (
-                <GitBranch className="h-2.5 w-2.5 opacity-50 transition-opacity group-hover/chip:opacity-100" />
-              )}
-              <span className="truncate">{task.branchName}</span>
-            </button>
-          )}
-        </div>
-
-        {/* Pipeline stepper */}
+        {/* Pipeline */}
         <Pipeline current={stepIndex} failed={failed} rejected={statusLower === 'rejected'} />
 
-        {/* Live activity */}
-        <div className="mx-4 mb-2">
+        {/* Task branch and commit tags */}
+        <div className="mx-4 mb-3 flex flex-wrap items-center gap-1.5">
+          <span className="inline-flex items-center gap-1 rounded-md border border-black/[0.06] bg-black/[0.03] px-2 py-0.5 font-mono-code text-[11px] text-[var(--muted-foreground)]">
+            <FileText className="h-3 w-3" />
+            waycode/{task.taskId.slice(0, 8)}
+            <button
+              type="button"
+              onClick={() => void copyText('taskId', task.taskId)}
+              className="ml-0.5 opacity-60 hover:opacity-100"
+              title="Copy task ID"
+            >
+              {copiedField === 'taskId' ? <Check className="h-2.5 w-2.5 text-[var(--success)]" /> : <Copy className="h-2.5 w-2.5" />}
+            </button>
+          </span>
+
+          <span className="inline-flex items-center gap-1 rounded-md border border-black/[0.06] bg-black/[0.03] px-2 py-0.5 font-mono-code text-[11px] text-[var(--muted-foreground)]">
+            <GitBranch className="h-3 w-3" />
+            {task.branchName}
+            <button
+              type="button"
+              onClick={() => void copyText('branch', task.branchName)}
+              className="ml-0.5 opacity-60 hover:opacity-100"
+              title="Copy branch name"
+            >
+              {copiedField === 'branch' ? <Check className="h-2.5 w-2.5 text-[var(--success)]" /> : <Copy className="h-2.5 w-2.5" />}
+            </button>
+          </span>
+        </div>
+
+        {/* Agent Activity Terminal */}
+        <div className="mx-4 mb-3">
           <TelemetryStreamer taskId={task.taskId} active={taskActive} />
         </div>
 
+        {/* Tokens and Model info */}
         {usage.input != null && usage.output != null && usage.input + usage.output > 0 && (
           <p className="flex items-center justify-center gap-1.5 pb-2.5 text-[10px] font-medium text-[var(--muted-foreground)]">
             <Cpu className="h-3 w-3 shrink-0" />
@@ -1051,6 +1065,12 @@ function TaskCard({
         taskId={task.taskId}
         branchName={task.branchName}
         diffContent={diffContent ?? ''}
+        onApproved={() => {
+          setStatus('completed')
+        }}
+        onRejected={() => {
+          setStatus('rejected')
+        }}
         onRetryQueued={(info) => {
           setReviewOpen(false)
           onRetryQueued?.(info)

@@ -38,6 +38,10 @@ interface DiffReviewModalProps {
   decision?: 'pushed' | 'rejected' | null
   /** Fired when a rejection re-queues as a fresh task carrying reviewer feedback. */
   onRetryQueued?: (info: RetryQueuedInfo) => void
+  /** Fired when the user approves and ships changes to GitHub. */
+  onApproved?: (prUrl?: string | null) => void
+  /** Fired when the task is rejected. */
+  onRejected?: () => void
 }
 
 export interface FileDiff {
@@ -129,6 +133,8 @@ export function DiffReviewModal({
   diffContent,
   decision = null,
   onRetryQueued,
+  onApproved,
+  onRejected,
 }: DiffReviewModalProps) {
   const [isApproving, setIsApproving] = useState(false)
   const [isRejecting, setIsRejecting] = useState(false)
@@ -172,6 +178,7 @@ export function DiffReviewModal({
 
       if (res.ok && data.success) {
         setResult('approved')
+        onApproved?.(data.pullRequestUrl)
         toast.success('Approved & pushed to GitHub', {
           description: `Branch ${branchName || 'working branch'} pushed · PR created · WhatsApp confirmation dispatched.`,
         })
@@ -204,6 +211,7 @@ export function DiffReviewModal({
       }
 
       setResult('rejected')
+      onRejected?.()
       if (data.retried) {
         toast.success('Re-running with your feedback', {
           description: `A fresh attempt was queued · ${data.branchName}`,
