@@ -4,6 +4,7 @@ import Redis from 'ioredis'
 import { decryptSecret } from '../lib/crypto'
 import { resolveProvider, type EffectiveProvider } from '../lib/byok'
 import { sendPushToUser } from '../lib/push'
+import { sendReviewWhatsAppAlert } from '../lib/deploy-notify'
 import { runTask, type ChatMessage, type ModelCaller, type TaskContext } from './run-task'
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
@@ -57,6 +58,47 @@ async function updateJobStatus(
       url: '/tasks',
       tag: taskId,
     })
+
+    // Out-of-band WhatsApp Review Alert
+    if (status === 'verifying') {
+      void (async () => {
+        try {
+          const { data: job } = await supabase
+            .from('task_jobs')
+            .select('prompt, branch_name, repo_id, diff_content')
+            .eq('id', taskId)
+            .single()
+
+          let repoName = ''
+          if (job?.repo_id) {
+            const { data: repo } = await supabase
+              .from('repositories')
+              .select('repo_name')
+              .eq('id', job.repo_id)
+              .single()
+            repoName = repo?.repo_name || ''
+          }
+
+          const diffStr = extra?.diffContent || job?.diff_content || ''
+          const filesChanged = (diffStr.match(/^diff --git/gm) || []).length || 1
+          const additions = diffStr.split('\n').filter((l: string) => l.startsWith('+') && !l.startsWith('+++')).length
+          const deletions = diffStr.split('\n').filter((l: string) => l.startsWith('-') && !l.startsWith('---')).length
+
+          await sendReviewWhatsAppAlert(supabase, {
+            id: taskId,
+            user_id: extra.userId!,
+            prompt: job?.prompt,
+            repo_name: repoName,
+            branch_name: job?.branch_name,
+            files_changed: filesChanged,
+            additions,
+            deletions,
+          })
+        } catch (err) {
+          console.error('[WhatsApp Review Alert Trigger Error]', err)
+        }
+      })()
+    }
   }
 }
 

@@ -64,6 +64,72 @@ export function formatWhatsAppDeployMessage(task: DeployTask, event: DeployEvent
   return lines.filter((l) => l !== null).join('\n')
 }
 
+export interface ReviewTask {
+  id: string
+  user_id: string
+  prompt?: string | null
+  repo_name?: string | null
+  branch_name?: string | null
+  files_changed?: number | null
+  additions?: number | null
+  deletions?: number | null
+  app_url?: string | null
+}
+
+/**
+ * Format WhatsApp review alert for when an autonomous task is ready for review.
+ */
+export function formatWhatsAppReviewMessage(task: ReviewTask): string {
+  const branchShort = task.branch_name || 'task-branch'
+  const count = task.files_changed || 1
+  const add = task.additions ?? 0
+  const del = task.deletions ?? 0
+  const appUrl = task.app_url || process.env.NEXT_PUBLIC_APP_URL || 'https://waycode.dev'
+
+  const lines = [
+    `🔔 *Code Ready for Review*`,
+    `Your WayCode autonomous agent has finished applying changes and verified the build.`,
+    ``,
+    task.prompt ? `📝 *Task:*\n${String(task.prompt).slice(0, 180)}` : null,
+    ``,
+    task.repo_name ? `📦 *Repository:* ${task.repo_name}` : null,
+    `🔖 *Branch:* ${branchShort}`,
+    `📁 *Changes:* ${count} file${count > 1 ? 's' : ''} (+${add} / -${del})`,
+    ``,
+    `👉 *Review & Approve:*`,
+    `${appUrl}/tasks`,
+    ``,
+    `Please review the diff in WayCode to approve and push to GitHub! 🚀`,
+  ]
+
+  return lines.filter((l) => l !== null).join('\n')
+}
+
+/**
+ * Sends a WhatsApp notification when code changes are verified and ready for review.
+ */
+export async function sendReviewWhatsAppAlert(
+  supabase: SupabaseClient,
+  task: ReviewTask,
+): Promise<void> {
+  try {
+    const number = await getWhatsAppNumber(supabase, task.user_id)
+    if (number) {
+      const text = formatWhatsAppReviewMessage(task)
+      const sent = await sendWhatsAppText(number, text)
+      if (sent) {
+        await supabase.from('task_logs').insert({
+          task_id: task.id,
+          log_level: 'info',
+          message: `[WhatsApp] Sent review request alert to registered WhatsApp number.`,
+        })
+      }
+    }
+  } catch (err) {
+    console.error('[WhatsApp Review Alert] Error:', err)
+  }
+}
+
 /**
  * Single funnel for deployment telemetry (PRD §5.7 / §7.7): append to the
  * task log, then fan out WhatsApp + web push to the owner. Never throws.

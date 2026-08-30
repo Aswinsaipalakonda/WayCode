@@ -38,7 +38,13 @@ export async function getWhatsAppNumber(
 export async function sendWhatsAppText(to: string, body: string): Promise<boolean> {
   const { token, phoneId } = getWhatsAppConfig()
   if (!token || !phoneId) {
-    console.warn('[WhatsApp] Skipped — WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID not configured.')
+    console.warn('[WhatsApp] Skipped — WHATSAPP_TOKEN / WHATSAPP_PHONE_NUMBER_ID not configured in .env.local.')
+    return false
+  }
+
+  const cleanTo = to.replace(/[^\d+]/g, '')
+  if (!cleanTo) {
+    console.warn('[WhatsApp] Invalid recipient phone number provided.')
     return false
   }
 
@@ -53,7 +59,7 @@ export async function sendWhatsAppText(to: string, body: string): Promise<boolea
         },
         body: JSON.stringify({
           messaging_product: 'whatsapp',
-          to: to.replace(/[^\d+]/g, ''),
+          to: cleanTo,
           type: 'text',
           text: { preview_url: true, body },
         }),
@@ -61,12 +67,14 @@ export async function sendWhatsAppText(to: string, body: string): Promise<boolea
       },
     )
     if (!res.ok) {
-      console.error('[WhatsApp] Send failed:', await res.text().catch(() => res.status))
+      const errText = await res.text().catch(() => String(res.status))
+      console.error(`[WhatsApp] Send failed to ${cleanTo} (HTTP ${res.status}):`, errText)
       return false
     }
+    console.log(`[WhatsApp] Successfully delivered alert to ${cleanTo}`)
     return true
   } catch (err) {
-    console.error('[WhatsApp] Send error:', err)
+    console.error('[WhatsApp] Send network error:', err)
     return false
   }
 }
