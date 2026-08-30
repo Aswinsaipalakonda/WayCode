@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { encryptSecret } from '@/lib/crypto'
+import { encryptSecret, decryptSecret } from '@/lib/crypto'
 import { NextResponse } from 'next/server'
 
 const VALID_PROVIDERS = new Set(['openrouter', 'gemini', 'custom'])
@@ -66,6 +66,24 @@ export async function POST(request: Request) {
         { error: 'An API key is required for the first save' },
         { status: 400 },
       )
+    } else {
+      try {
+        const decrypted = decryptSecret(existing.api_key)
+        if (provider === 'gemini' && !decrypted.startsWith('AIza')) {
+          return NextResponse.json(
+            { error: 'Please enter your Google Gemini API key (starts with AIza) for direct Gemini. Or select OpenRouter to use Gemini models with your OpenRouter key.' },
+            { status: 400 },
+          )
+        }
+        if (provider === 'openrouter' && !decrypted.startsWith('sk-or-')) {
+          return NextResponse.json(
+            { error: 'Please enter your OpenRouter API key (starts with sk-or-v1-).' },
+            { status: 400 },
+          )
+        }
+      } catch {
+        /* proceed */
+      }
     }
 
     const { error: upsertError } = await supabase

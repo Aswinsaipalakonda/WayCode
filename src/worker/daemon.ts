@@ -1,4 +1,4 @@
-﻿import path from 'path'
+import path from 'path'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import Redis from 'ioredis'
 import { decryptSecret } from '../lib/crypto'
@@ -110,7 +110,6 @@ function makeModelCaller(apiKey: string, providerRaw: string, model: string, cus
         }),
       })
     } else {
-      // OpenAI-compatible surface (OpenRouter / Gemini OpenAI layer / custom).
       res = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -119,6 +118,23 @@ function makeModelCaller(apiKey: string, providerRaw: string, model: string, cus
         },
         body: JSON.stringify({
           model,
+          messages: messages.map((m) => ({ role: m.role, content: m.content })),
+          temperature: 0.2,
+        }),
+      })
+    }
+
+    if (!res.ok && res.status === 404 && provider === 'openrouter' && model !== 'google/gemini-2.0-flash-exp:free') {
+      const fallbackModel = 'google/gemini-2.0-flash-exp:free'
+      console.warn(`[Daemon] Model '${model}' returned 404. Falling back to active '${fallbackModel}'...`)
+      res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: fallbackModel,
           messages: messages.map((m) => ({ role: m.role, content: m.content })),
           temperature: 0.2,
         }),

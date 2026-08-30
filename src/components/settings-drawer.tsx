@@ -51,15 +51,15 @@ const PROVIDERS: ProviderMeta[] = [
   {
     id: 'openrouter',
     label: 'OpenRouter',
-    hint: '400+ models · live catalog',
+    hint: '400+ models · Free Gemini, Llama, Qwen, DeepSeek with 1 key',
     color: '#6566f1',
     tint: 'rgba(101, 102, 241, 0.12)',
     Icon: SiOpenrouter,
   },
   {
     id: 'gemini',
-    label: 'Gemini API',
-    hint: 'Google AI Studio · direct billing',
+    label: 'Google Gemini API',
+    hint: 'Direct Google AI Studio billing (AIza... key)',
     color: '#8e75b2',
     tint: 'rgba(142, 117, 178, 0.14)',
     Icon: SiGooglegemini,
@@ -67,7 +67,7 @@ const PROVIDERS: ProviderMeta[] = [
   {
     id: 'custom',
     label: 'Custom / Claude',
-    hint: 'Any OpenAI-compatible URL · sk-ant keys',
+    hint: 'Anthropic (sk-ant-...) or any OpenAI-compatible Base URL',
     color: '#0a66ff',
     tint: 'rgba(10, 102, 255, 0.1)',
     Icon: TbApi,
@@ -78,6 +78,63 @@ const KEY_PLACEHOLDER: Record<Provider, string> = {
   openrouter: 'sk-or-v1-…',
   gemini: 'AIza…',
   custom: 'sk-ant-… · sk-… · any OpenAI-compatible key',
+}
+
+const QUICK_PICKS: Record<Provider, Array<{ id: string; label: string; tag: string; desc: string }>> = {
+  openrouter: [
+    {
+      id: 'google/gemini-2.0-flash-exp:free',
+      label: 'Gemini 2.0 Flash (Free)',
+      tag: '100% FREE',
+      desc: 'Ultra-fast, massive 1M context, state-of-the-art code generation.',
+    },
+    {
+      id: 'meta-llama/llama-3.3-70b-instruct:free',
+      label: 'Llama 3.3 70B (Free)',
+      tag: '100% FREE',
+      desc: 'Top open-weights coding model with deep architectural reasoning.',
+    },
+    {
+      id: 'qwen/qwen-2.5-coder-32b-instruct:free',
+      label: 'Qwen 2.5 Coder 32B (Free)',
+      tag: '100% FREE',
+      desc: 'Specialized for code review, TypeScript/Python, and AST transformations.',
+    },
+    {
+      id: 'deepseek/deepseek-r1:free',
+      label: 'DeepSeek R1 (Free)',
+      tag: 'REASONING',
+      desc: 'Advanced chain-of-thought logic synthesis and debugging.',
+    },
+  ],
+  gemini: [
+    {
+      id: 'gemini-2.0-flash',
+      label: 'Gemini 2.0 Flash',
+      tag: 'GOOGLE API',
+      desc: 'Direct Google AI Studio endpoint with high rate limits.',
+    },
+    {
+      id: 'gemini-1.5-pro',
+      label: 'Gemini 1.5 Pro',
+      tag: '2M CONTEXT',
+      desc: 'Deep multi-file analysis across massive repository trees.',
+    },
+  ],
+  custom: [
+    {
+      id: 'claude-3-5-sonnet-20241022',
+      label: 'Claude 3.5 Sonnet',
+      tag: 'ANTHROPIC',
+      desc: 'Industry benchmark for precise coding, diffing, and system design.',
+    },
+    {
+      id: 'claude-3-5-haiku-20241022',
+      label: 'Claude 3.5 Haiku',
+      tag: 'FAST & CHEAP',
+      desc: 'Low-latency code generation for rapid iteration loops.',
+    },
+  ],
 }
 
 interface ModelEntry {
@@ -707,6 +764,22 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                       )
                     })}
                   </div>
+
+                  {/* Contextual guidance when switching to Gemini */}
+                  {provider === 'gemini' && (!savedVault?.hasKey || savedVault.provider !== 'gemini') && (
+                    <div className="mt-2 rounded-2xl border border-purple-500/20 bg-purple-500/5 p-3 text-[11px] text-purple-950">
+                      <div className="flex items-center gap-1.5 font-bold text-purple-700">
+                        <SiGooglegemini className="h-3.5 w-3.5" />
+                        Google AI Studio API Key
+                      </div>
+                      <p className="mt-1 text-[10.5px] leading-relaxed text-purple-900/80">
+                        Paste your Google Gemini API key (<code className="font-mono-code font-semibold">AIza...</code>) below to connect direct Google billing.
+                      </p>
+                      <p className="mt-1.5 text-[10px] text-purple-700 font-medium">
+                        💡 <strong>Pro-tip:</strong> You can also access Gemini models for free by choosing <strong>OpenRouter</strong> above.
+                      </p>
+                    </div>
+                  )}
                 </section>
 
                 {/* Custom base URL */}
@@ -830,8 +903,8 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                   )}
                 </section>
 
-                {/* Model routing — fully dynamic */}
-                <section className="space-y-2">
+                {/* Model routing — fully dynamic with Active Hero & Quick-Picks */}
+                <section className="space-y-3">
                   <SectionLabel
                     icon={<TbCpu className="h-3 w-3" />}
                     aside={
@@ -845,11 +918,87 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                     Model Routing
                   </SectionLabel>
 
+                  {/* Active Model Hero Card — Always visible when a model is selected or connected */}
+                  {model && (
+                    <div className="relative overflow-hidden rounded-2xl border border-[var(--brand)]/30 bg-gradient-to-br from-[var(--brand)]/10 via-[var(--card)] to-[var(--cyan)]/5 p-4 shadow-sm">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-[#10b981]/15 px-2.5 py-0.5 text-[10px] font-bold text-[#10b981]">
+                              <TbCircleCheckFilled className="h-3 w-3" />
+                              Current Selected Model
+                            </span>
+                            {model.endsWith(':free') && (
+                              <span className="rounded-full bg-[var(--success-soft)] px-2 py-0.5 text-[9.5px] font-bold text-[var(--success)]">
+                                100% Free
+                              </span>
+                            )}
+                            <span className="text-[10px] font-semibold text-[var(--muted-foreground)]">
+                              via {PROVIDERS.find((p) => p.id === provider)?.label ?? provider}
+                            </span>
+                          </div>
+
+                          <h3 className="mt-2 font-mono-code text-[13.5px] font-bold text-[var(--foreground)] break-all leading-snug">
+                            {model}
+                          </h3>
+
+                          <p className="mt-1 text-[11px] text-[var(--muted-foreground)]">
+                            All autonomous agent tasks & code modifications will execute using this engine.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Curated Quick-Picks for Instant 1-Tap Switch */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between px-0.5">
+                      <span className="flex items-center gap-1 text-[10.5px] font-bold uppercase tracking-wider text-[var(--muted-foreground)]">
+                        <TbBolt className="h-3 w-3 text-amber-500" />
+                        Recommended Models
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {(QUICK_PICKS[provider] || []).map((pick) => {
+                        const isSelected = model === pick.id
+                        return (
+                          <button
+                            key={pick.id}
+                            type="button"
+                            onClick={() => setModel(pick.id)}
+                            className={`pressable flex flex-col justify-between rounded-xl border p-2.5 text-left transition-all ${
+                              isSelected
+                                ? 'border-[var(--brand)] bg-[var(--brand-soft)] shadow-[0_0_0_2px_var(--brand)]'
+                                : 'border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border-strong)] hover:bg-[var(--card-hover)]'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-1">
+                              <span className="text-xs font-bold text-[var(--foreground)] leading-tight">
+                                {pick.label}
+                              </span>
+                              {isSelected ? (
+                                <TbCircleCheckFilled className="h-4 w-4 shrink-0 text-[var(--brand)]" />
+                              ) : (
+                                <span className="rounded bg-black/5 px-1.5 py-0.5 font-mono-code text-[8px] font-bold text-[var(--muted-foreground)]">
+                                  {pick.tag}
+                                </span>
+                              )}
+                            </div>
+                            <p className="mt-1 text-[10px] text-[var(--muted-foreground)] leading-snug line-clamp-2">
+                              {pick.desc}
+                            </p>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+
                   {stage !== 'connected' && (
-                    <div className="rounded-xl border border-dashed border-[var(--border-strong)] px-3 py-5 text-center">
+                    <div className="rounded-xl border border-dashed border-[var(--border-strong)] px-3 py-4 text-center">
                       <TbCpu className="mx-auto h-5 w-5 text-[var(--muted-foreground)] opacity-60" />
                       <p className="mt-1.5 text-[11.5px] font-medium text-[var(--muted-foreground)]">
-                        Validate your key below to load the{' '}
+                        Validate your key to load the{' '}
                         <span className="font-bold text-[var(--foreground-secondary)]">live model catalog</span>
                       </p>
                     </div>
@@ -879,7 +1028,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                           type="text"
                           value={search}
                           onChange={(e) => setSearch(e.target.value)}
-                          placeholder="Filter models…"
+                          placeholder="Search 400+ models…"
                           className={`${inputCls} pl-9 pr-9`}
                           spellCheck={false}
                         />
@@ -966,13 +1115,6 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                       <TbAlertTriangleFilled className="h-4 w-4 shrink-0 text-[var(--error)]" />
                       <p className="min-w-0 flex-1 truncate text-[11px] font-medium text-[var(--error)]">{modelsError}</p>
                     </div>
-                  )}
-
-                  {model && stage === 'connected' && catalog.length > 0 && (
-                    <p className="flex items-center gap-1.5 px-1 pt-1 font-mono-code text-[10px] text-[var(--muted-foreground)]">
-                      <TbCheck className="h-3 w-3 shrink-0 text-[var(--success)]" />
-                      routing tasks via <span className="truncate font-semibold text-[var(--foreground-secondary)]">{model}</span>
-                    </p>
                   )}
                 </section>
               </div>
@@ -1264,7 +1406,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                   ) : (
                     <TbShieldLock className="h-4 w-4" />
                   )}
-                  Save Vault
+                  Save & Route Tasks
                 </button>
               </div>
             ) : (
