@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { toast } from 'sonner'
 import { SiOpenrouter, SiGooglegemini } from 'react-icons/si'
@@ -324,8 +324,20 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
         const targetModel = preferredModel || model
         if (targetModel && list.some((m) => m.id === targetModel)) {
           setModel(targetModel)
-        } else if (list.length > 0 && !targetModel) {
-          setModel(list[0]?.id ?? '')
+        } else if (list.length > 0) {
+          // If preferred model was retired by provider (e.g. nvidia 404), pick Gemini 2.0 Flash or first free model
+          const fallback =
+            list.find((m) => m.id === 'google/gemini-2.0-flash-exp:free') ||
+            list.find((m) => m.free) ||
+            list[0]
+          if (fallback) {
+            setModel(fallback.id)
+            if (targetModel && targetModel !== fallback.id) {
+              toast.info('Model updated', {
+                description: `Previous model was retired by provider. Switched to ${fallback.name}.`,
+              })
+            }
+          }
         }
       } else {
         setModelsError(data.error || 'Could not load the model catalog from vault.')
@@ -335,12 +347,20 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
     } finally {
       setLoadingModels(false)
     }
-  }, [provider, model])
+  }, [provider])
+
+  const isOpenRef = useRef(false)
 
   // Every open restores the persisted vault — provider, model, and proof of
   // the stored key (masked). The key stays encrypted server-side forever.
   useEffect(() => {
-    if (!isOpen) return
+    if (!isOpen) {
+      isOpenRef.current = false
+      return
+    }
+    if (isOpenRef.current) return
+    isOpenRef.current = true
+
     let cancelled = false
     ;(async () => {
       const vault = await fetchVault()
@@ -375,6 +395,14 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
       cancelled = true
     }
   }, [isOpen, fetchVault, loadVaultModels])
+
+  const handleSelectModel = (newModelId: string) => {
+    setModel(newModelId)
+    toast.success('Model selected', {
+      description: `${newModelId.split('/').pop()?.replace(':free', '') || newModelId} active. Click "Save & Route Tasks" to apply.`,
+      duration: 2200,
+    })
+  }
 
   const updateCredentials = (patch: Partial<{ apiKey: string; baseUrl: string }>) => {
     setCredentials((prev) => ({ ...prev, [provider]: { ...prev[provider], ...patch } }))
@@ -966,7 +994,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                           <button
                             key={pick.id}
                             type="button"
-                            onClick={() => setModel(pick.id)}
+                            onClick={() => handleSelectModel(pick.id)}
                             className={`pressable flex flex-col justify-between rounded-xl border p-2.5 text-left transition-all ${
                               isSelected
                                 ? 'border-[var(--brand)] bg-[var(--brand-soft)] shadow-[0_0_0_2px_var(--brand)]'
@@ -1067,7 +1095,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                                 key={m.id}
                                 entry={m}
                                 selected={model === m.id}
-                                onSelect={() => setModel(m.id)}
+                                onSelect={() => handleSelectModel(m.id)}
                                 copied={copiedModel === m.id}
                                 onCopy={() => handleCopyModel(m.id)}
                               />
@@ -1099,7 +1127,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                                 key={m.id}
                                 entry={m}
                                 selected={model === m.id}
-                                onSelect={() => setModel(m.id)}
+                                onSelect={() => handleSelectModel(m.id)}
                                 copied={copiedModel === m.id}
                                 onCopy={() => handleCopyModel(m.id)}
                               />
@@ -1435,7 +1463,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
         catalog={catalog}
         selected={model}
         onSelect={(id) => {
-          setModel(id)
+          handleSelectModel(id)
           setModelPicker(null)
         }}
         copiedModel={copiedModel}
