@@ -490,20 +490,20 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
             </motion.div>
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-2xl space-y-4 px-4 pt-4 sm:px-6">
+          <div className="mx-auto w-full max-w-2xl min-w-0 space-y-4 px-3 sm:px-6 pt-4">
             {messages.map((message) =>
               message.role === 'user' ? (
-                /* User message — white bubble + avatar right + timestamp (Gemini format) */
+                /* User message — responsive white bubble + avatar right + timestamp */
                 <motion.div
                   key={message.id}
                   layout="position"
                   initial={{ opacity: 0, y: 16, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                  className="flex items-start justify-end gap-2.5"
+                  className="flex w-full min-w-0 items-start justify-end gap-2 sm:gap-2.5"
                 >
-                  <div className="flex max-w-[82%] flex-col items-end">
-                    <div className="whitespace-pre-wrap break-words rounded-[22px] rounded-br-lg border border-black/[0.05] bg-white px-4 py-3 text-[14px] leading-relaxed shadow-[var(--shadow-sm)]">
+                  <div className="flex min-w-0 max-w-[86%] sm:max-w-[78%] flex-col items-end">
+                    <div className="min-w-0 max-w-full rounded-[22px] rounded-br-lg border border-black/[0.05] bg-white px-3.5 py-2.5 sm:px-4 sm:py-3 text-[13.5px] sm:text-[14px] leading-relaxed shadow-[var(--shadow-sm)] [overflow-wrap:anywhere] break-words whitespace-pre-wrap">
                       {message.text}
                     </div>
                     <span className="mt-1 mr-1 text-[10px] font-medium text-[var(--muted-foreground)]">
@@ -786,7 +786,8 @@ const PIPELINE_STEPS = [
   { key: 'queued', label: 'Queued', hint: 'Task accepted and waiting for a worker' },
   { key: 'generating', label: 'Generating', hint: 'AI is writing the changes on your branch' },
   { key: 'verifying', label: 'Verifying', hint: 'Compile & syntax checks are running' },
-  { key: 'review', label: 'Review', hint: 'Diff is ready — nothing ships until you approve' },
+  { key: 'review', label: 'Review', hint: 'Build verified — ready for your review and approval' },
+  { key: 'pushed', label: 'Pushed', hint: 'Approved and shipped to GitHub' },
 ] as const
 
 function TaskCard({
@@ -887,14 +888,14 @@ function TaskCard({
               ? 'Generating changes…'
               : 'Queued for the build daemon…'
 
-  // Map raw status → pipeline stage index.
+  // Map raw status → 5-stage pipeline stage index (0: Queued, 1: Generating, 2: Verifying, 3: Review, 4: Pushed).
   const stepIndex = ['completed', 'success'].includes(statusLower)
-    ? 3
+    ? 4 // Pushed stage — all 5 steps complete
     : ['verifying', 'build_verified'].includes(statusLower)
-      ? 2
+      ? 3 // Review stage — Queued, Generating, Verifying all verified and checked!
       : statusLower === 'processing'
-        ? 1
-        : 0
+        ? 1 // Generating stage
+        : 0 // Queued stage
 
   const copyText = async (key: string, value: string) => {
     try {
@@ -926,7 +927,7 @@ function TaskCard({
               )}
               <span className="relative flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-black shadow-[var(--shadow-sm)]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo-white.svg" alt="WayCode" className="h-5 w-5 object-contain" />
+                <img src="/icon.png" alt="WayCode" className="h-5 w-5 object-contain" />
               </span>
             </span>
 
@@ -953,7 +954,7 @@ function TaskCard({
           </span>
         </div>
 
-        {/* Pipeline */}
+        {/* 5-Stage Pipeline */}
         <Pipeline current={stepIndex} failed={failed} rejected={statusLower === 'rejected'} />
 
         {/* Task branch and commit tags */}
@@ -1099,13 +1100,13 @@ function Pipeline({
   const pct = (current / (PIPELINE_STEPS.length - 1)) * 100
 
   return (
-    <div className="mx-4 mb-3 mt-1">
+    <div className="mx-3 sm:mx-4 mb-3 mt-1">
       <div className="relative flex items-start justify-between">
         {/* Track */}
-        <div className="absolute left-[12.5%] right-[12.5%] top-[7px] h-[2px] rounded-full bg-black/[0.07]">
+        <div className="absolute left-[10%] right-[10%] top-[7px] h-[2px] rounded-full bg-black/[0.07]">
           <motion.div
             initial={{ width: 0 }}
-            animate={{ width: `${failed || rejected ? Math.max(pct - 33, 0) : pct}%` }}
+            animate={{ width: `${failed || rejected ? Math.max(pct - 25, 0) : pct}%` }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             className={`h-full rounded-full ${
               failed ? 'bg-[var(--error)]' : 'bg-gradient-to-r from-[var(--brand)] to-[var(--cyan)]'
@@ -1120,7 +1121,7 @@ function Pipeline({
           const isRejected = isCurrent && rejected
 
           return (
-            <div key={step.key} className="relative z-10 flex w-1/4 flex-col items-center gap-1" title={step.hint}>
+            <div key={step.key} className="relative z-10 flex w-1/5 flex-col items-center gap-1" title={step.hint}>
               <span
                 className={`flex h-[14px] w-[14px] items-center justify-center rounded-full border-2 transition-colors duration-300 ${
                   isError
@@ -1141,7 +1142,7 @@ function Pipeline({
                 )}
               </span>
               <span
-                className={`text-[9px] font-bold leading-none ${
+                className={`text-[8.5px] sm:text-[9.5px] font-bold leading-none ${
                   isError
                     ? 'text-[var(--error)]'
                     : isRejected

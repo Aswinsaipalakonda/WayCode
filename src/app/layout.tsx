@@ -41,6 +41,8 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+import { SmoothScrollProvider } from "@/components/smooth-scroll-provider";
+
 export default function RootLayout({
   children,
 }: {
@@ -51,27 +53,29 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${jetbrainsMono.variable} min-h-full flex flex-col antialiased`}
       >
-        <div className="ambient-scene" aria-hidden="true">
-          <div className="ambient-orb ambient-orb-1" />
-          <div className="ambient-orb ambient-orb-2" />
-          <div className="ambient-orb ambient-orb-3" />
-        </div>
+        <SmoothScrollProvider>
+          <div className="ambient-scene" aria-hidden="true">
+            <div className="ambient-orb ambient-orb-1" />
+            <div className="ambient-orb ambient-orb-2" />
+            <div className="ambient-orb ambient-orb-3" />
+          </div>
 
-        {children}
+          {children}
 
-        <Toaster
-          position="top-center"
-          toastOptions={{
-            style: {
-              background: "#ffffff",
-              border: "1px solid var(--border)",
-              color: "var(--foreground)",
-              borderRadius: "16px",
-              boxShadow: "0 12px 40px -12px rgba(24,30,44,0.25)",
-              fontSize: "13px",
-            },
-          }}
-        />
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              style: {
+                background: "#ffffff",
+                border: "1px solid var(--border)",
+                color: "var(--foreground)",
+                borderRadius: "16px",
+                boxShadow: "0 12px 40px -12px rgba(24,30,44,0.25)",
+                fontSize: "13px",
+              },
+            }}
+          />
+        </SmoothScrollProvider>
       </body>
     </html>
   );
