@@ -124,8 +124,8 @@ function makeModelCaller(apiKey: string, providerRaw: string, model: string, cus
       })
     }
 
-    if (!res.ok && res.status === 404 && provider === 'openrouter' && model !== 'google/gemini-2.0-flash-exp:free') {
-      const fallbackModel = 'google/gemini-2.0-flash-exp:free'
+    if (!res.ok && res.status === 404 && provider === 'openrouter' && model !== 'google/gemma-4-31b-it:free') {
+      const fallbackModel = 'google/gemma-4-31b-it:free'
       console.warn(`[Daemon] Model '${model}' returned 404. Falling back to active '${fallbackModel}'...`)
       res = await fetch(endpoint, {
         method: 'POST',
