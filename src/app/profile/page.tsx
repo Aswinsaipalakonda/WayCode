@@ -34,8 +34,8 @@ export default async function ProfilePage() {
 
   return (
     <AppChrome user={user} initialRepositories={repositories || []} bodyClassName="chat-scene">
-      <div className="h-full overflow-y-auto pb-28 md:pb-10">
-        <main className="anim-slide-right mx-auto w-full max-w-xl space-y-5 px-4 pt-5 sm:px-6">
+      <div className="min-h-0 flex-1 overflow-y-auto smooth-scroll-container pb-28 md:pb-12">
+        <div className="anim-slide-right mx-auto w-full max-w-xl space-y-5 px-4 pt-5 sm:px-6">
           <div className="anim-fade-up pt-1">
             <h1 className="text-[26px] font-bold tracking-tight sm:text-3xl">
               <span className="text-gradient-brand">Profile</span>
@@ -145,7 +145,7 @@ export default async function ProfilePage() {
               Sign out
             </button>
           </form>
-        </main>
+        </div>
       </div>
     </AppChrome>
   )

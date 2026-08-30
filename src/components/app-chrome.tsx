@@ -189,7 +189,7 @@ export function AppChrome({ user, initialRepositories, bodyClassName, children }
             )}
           </AnimatePresence>
 
-          <main className={`min-w-0 flex-1 ${bodyClassName ?? ''}`}>{children}</main>
+          <main className={`flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${bodyClassName ?? ''}`}>{children}</main>
         </div>
 
         <BottomNav />
