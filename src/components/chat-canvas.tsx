@@ -1135,7 +1135,8 @@ function Pipeline({
   failed: boolean
   rejected: boolean
 }) {
-  const pct = (current / (PIPELINE_STEPS.length - 1)) * 100
+  const isAllCompleted = current >= PIPELINE_STEPS.length - 1 && !(failed || rejected)
+  const pct = isAllCompleted ? 100 : (current / (PIPELINE_STEPS.length - 1)) * 100
 
   return (
     <div className="mx-3 sm:mx-4 mb-3 mt-1">
@@ -1147,14 +1148,18 @@ function Pipeline({
             animate={{ width: `${failed || rejected ? Math.max(pct - 25, 0) : pct}%` }}
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             className={`h-full rounded-full ${
-              failed ? 'bg-[var(--error)]' : 'bg-gradient-to-r from-[var(--brand)] to-[var(--cyan)]'
+              failed
+                ? 'bg-[var(--error)]'
+                : isAllCompleted
+                  ? 'bg-[var(--success)]'
+                  : 'bg-gradient-to-r from-[var(--brand)] to-[var(--cyan)]'
             }`}
           />
         </div>
 
         {PIPELINE_STEPS.map((step, i) => {
-          const done = i < current && !(failed || rejected)
-          const isCurrent = i === current
+          const done = (i < current || (i === current && isAllCompleted)) && !(failed || rejected)
+          const isCurrent = i === current && !isAllCompleted
           const isError = isCurrent && failed
           const isRejected = isCurrent && rejected
 
@@ -1167,7 +1172,9 @@ function Pipeline({
                     : isRejected
                       ? 'border-[var(--muted-foreground)] bg-[var(--background)]'
                       : done
-                        ? 'border-transparent bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)]'
+                        ? isAllCompleted
+                          ? 'border-transparent bg-[var(--success)] shadow-xs'
+                          : 'border-transparent bg-gradient-to-br from-[var(--brand)] to-[var(--cyan)]'
                         : isCurrent
                           ? 'border-[var(--brand)] bg-white'
                           : 'border-black/10 bg-white'
@@ -1186,7 +1193,9 @@ function Pipeline({
                     : isRejected
                       ? 'text-[var(--muted-foreground)]'
                       : done
-                        ? 'text-[var(--foreground-secondary)]'
+                        ? isAllCompleted
+                          ? 'text-[var(--success)] font-extrabold'
+                          : 'text-[var(--foreground-secondary)]'
                         : isCurrent
                           ? 'text-[var(--foreground)]'
                           : 'text-[var(--muted-foreground)] opacity-70'
