@@ -43,7 +43,7 @@ describe('WhatsApp Notification Helper', () => {
     expect(requestUrl).toContain('1213946748457901/messages')
     expect(requestBody).not.toBeNull()
     expect(requestBody!.messaging_product).toBe('whatsapp')
-    expect(requestBody!.to).toBe('+919876543210')
+    expect(requestBody!.to).toBe('919876543210')
     expect(requestBody!.type).toBe('text')
   })
 

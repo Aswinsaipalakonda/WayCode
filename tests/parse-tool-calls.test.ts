@@ -23,9 +23,13 @@ describe('parseToolCalls', () => {
     expect(parseToolCalls(raw)).toEqual([{ tool: 'done' }])
   })
 
-  it('returns empty for garbage, objects, and truncated arrays', () => {
+  it('parses a single tool object as a one-element array', () => {
+    expect(parseToolCalls('{"tool":"done"}')).toEqual([{ tool: 'done' }])
+  })
+
+  it('returns empty for garbage and truncated arrays', () => {
     expect(parseToolCalls('no json here')).toEqual([])
-    expect(parseToolCalls('{"tool":"done"}')).toEqual([])
+    expect(parseToolCalls('{"not_a_tool":"done"}')).toEqual([])
     expect(parseToolCalls('[{"tool":"list_files"')).toEqual([])
     expect(parseToolCalls('')).toEqual([])
   })
