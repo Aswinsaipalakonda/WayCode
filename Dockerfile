@@ -1,11 +1,11 @@
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
 # Install dependencies
 FROM base AS deps
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm install
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -15,6 +15,12 @@ COPY . .
 # Environment variables for build time
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+
+# Supabase build-time variables dummy or provided
+ARG NEXT_PUBLIC_SUPABASE_URL=https://cczeusftmsaykelqyfgu.supabase.co
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNjemV1c2Z0bXNheWtlbHF5Zmd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcwMzU5OTYsImV4cCI6MjEwMjYxMTk5Nn0.1ky7ZfW3EqvbbRd3pKbRzMC_tyHDHzDiWyL9O29zUrA
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 
 RUN npm run build
 
