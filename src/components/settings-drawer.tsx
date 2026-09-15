@@ -635,7 +635,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
     <>
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 z-50 flex justify-end">
+          <div data-lenis-prevent className="fixed inset-0 z-50 flex justify-end">
           {/* Scrim */}
           <motion.button
             aria-label="Close settings"
@@ -649,11 +649,12 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
 
           {/* Panel */}
           <motion.div
+            data-lenis-prevent
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-            className="relative flex h-full w-full max-w-md flex-col border-l border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-lg)]"
+            className="relative flex h-full h-[100dvh] max-h-[100dvh] w-full max-w-md flex-col border-l border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-lg)] overscroll-contain"
           >
             {/* Header */}
             <div className="border-b border-[var(--border)] px-5 pt-4">
@@ -711,7 +712,10 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
 
             {/* Body */}
             {activeTab === 'vault' ? (
-              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+              <div
+                data-lenis-prevent
+                className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain smooth-scroll-container touch-pan-y p-5"
+              >
                 {/* Live status strip */}
                 <motion.div
                   initial={false}
@@ -1162,7 +1166,10 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
               </div>
             ) : (
               /* Deploy Webhooks Panel */
-              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-5">
+              <div
+                data-lenis-prevent
+                className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain smooth-scroll-container touch-pan-y p-5"
+              >
                 {/* Outbound Webhook Section */}
                 <section className="space-y-3">
                   <SectionLabel icon={<TbRocket className="h-3 w-3" />}>
@@ -1651,12 +1658,13 @@ function ModelPickerModal({
           <motion.div
             role="dialog"
             aria-modal="true"
+            data-lenis-prevent
             aria-label={mode === 'free' ? 'All free models' : 'All models'}
             initial={{ y: '42%', opacity: 0.6 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '55%', opacity: 0.4 }}
             transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-            className="relative flex max-h-[76vh] w-full flex-col overflow-hidden rounded-t-[28px] bg-white shadow-[var(--shadow-lg)] sm:max-w-md sm:rounded-[28px]"
+            className="relative flex max-h-[85vh] sm:max-h-[76vh] w-full flex-col overflow-hidden rounded-t-[28px] bg-white shadow-[var(--shadow-lg)] sm:max-w-md sm:rounded-[28px]"
           >
             {/* Grab handle (mobile) */}
             <div className="flex justify-center pb-1 pt-3 sm:hidden">
@@ -1712,7 +1720,10 @@ function ModelPickerModal({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 pb-4">
+            <div
+              data-lenis-prevent
+              className="min-h-0 flex-1 space-y-1.5 overflow-y-auto overscroll-contain smooth-scroll-container touch-pan-y px-4 pb-4"
+            >
               {list.length === 0 ? (
                 <p className="anim-fade-in rounded-xl border border-dashed border-[var(--border-strong)] px-3 py-6 text-center text-[11.5px] text-[var(--muted-foreground)]">
                   No models match “{query.trim()}”.

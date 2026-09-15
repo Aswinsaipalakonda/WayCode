@@ -258,12 +258,13 @@ export function DiffReviewModal({
           <motion.div
             role="dialog"
             aria-modal="true"
+            data-lenis-prevent
             aria-label="Diff review"
             initial={{ y: 80, opacity: 0, scale: 0.98 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 60, opacity: 0, scale: 0.98 }}
             transition={{ type: 'spring', stiffness: 300, damping: 32 }}
-            className="relative flex h-[94vh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[24px] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-lg)] sm:h-[min(88vh,840px)] sm:rounded-[24px]"
+            className="relative flex h-[94vh] h-[94dvh] w-full max-w-4xl flex-col overflow-hidden rounded-t-[24px] border border-[var(--border)] bg-[var(--card)] shadow-[var(--shadow-lg)] overscroll-contain sm:h-[min(88vh,840px)] sm:rounded-[24px]"
           >
             {/* Header */}
             <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
@@ -357,7 +358,10 @@ export function DiffReviewModal({
             )}
 
             {/* Diff content cards */}
-            <div className="min-h-0 flex-1 overflow-y-auto smooth-scroll-container bg-[#05070c] p-4 font-mono-code text-[11px] leading-[1.7]">
+            <div
+              data-lenis-prevent
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain smooth-scroll-container touch-pan-y bg-[#05070c] p-4 font-mono-code text-[11px] leading-[1.7]"
+            >
               {fileDiffs.length > 0 ? (
                 <div className="space-y-5">
                   {displayedFiles.map((file) => (

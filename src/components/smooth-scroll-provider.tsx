@@ -15,6 +15,14 @@ export function SmoothScrollProvider({ children }: { children: React.ReactNode }
       wheelMultiplier: 1,
       touchMultiplier: 1.5,
       infinite: false,
+      prevent: (node) => {
+        return (
+          node.hasAttribute?.('data-lenis-prevent') ||
+          Boolean(node.closest?.('[data-lenis-prevent]')) ||
+          node.classList?.contains('smooth-scroll-container') ||
+          Boolean(node.closest?.('.smooth-scroll-container'))
+        )
+      },
     })
 
     function raf(time: number) {

@@ -47,12 +47,13 @@ export function RepoPicker({
           <motion.div
             role="dialog"
             aria-modal="true"
+            data-lenis-prevent
             aria-label="Choose a repository"
             initial={{ y: '42%', opacity: 0.6 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '55%', opacity: 0.4 }}
             transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-            className="relative w-full sm:max-w-md max-h-[72vh] flex flex-col bg-white rounded-t-[28px] sm:rounded-[28px] shadow-[var(--shadow-lg)] overflow-hidden"
+            className="relative w-full sm:max-w-md max-h-[85vh] sm:max-h-[72vh] flex flex-col bg-white rounded-t-[28px] sm:rounded-[28px] shadow-[var(--shadow-lg)] overflow-hidden"
           >
             {/* Grab handle (mobile) */}
             <div className="sm:hidden pt-3 pb-1 flex justify-center">
@@ -75,7 +76,10 @@ export function RepoPicker({
               </button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 space-y-1.5">
+            <div
+              data-lenis-prevent
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain smooth-scroll-container touch-pan-y px-4 pb-4 space-y-1.5"
+            >
               {repositories.length === 0 ? (
                 <div className="py-10 text-center">
                   <span className="anim-float mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--brand-soft)]">

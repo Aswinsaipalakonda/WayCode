@@ -124,7 +124,7 @@ export function WhatsAppOnboardingModal({ user }: WhatsAppOnboardingModalProps) 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3.5 sm:p-6 overflow-y-auto">
+        <div data-lenis-prevent className="fixed inset-0 z-50 flex items-center justify-center p-3.5 sm:p-6 overflow-y-auto overscroll-contain touch-pan-y">
           {/* Subtle Dim Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -138,6 +138,7 @@ export function WhatsAppOnboardingModal({ user }: WhatsAppOnboardingModalProps) 
           <motion.div
             role="dialog"
             aria-modal="true"
+            data-lenis-prevent
             initial={{ scale: 0.94, opacity: 0, y: 12 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.96, opacity: 0, y: 8 }}
