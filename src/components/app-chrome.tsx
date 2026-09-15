@@ -21,6 +21,7 @@ export interface Repository {
   id: string
   repo_name: string
   default_branch: string
+  is_private?: boolean
   deploy_webhook_url?: string | null
 }
 

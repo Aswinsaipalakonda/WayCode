@@ -59,10 +59,11 @@ export async function GET(request: Request) {
                 .eq('user_id', session.user.id)
             }
 
-            const repoRows = repos.map((r: { full_name: string; default_branch: string }) => ({
+            const repoRows = repos.map((r: { full_name: string; default_branch: string; private?: boolean }) => ({
               user_id: session.user.id,
               repo_name: r.full_name,
               default_branch: r.default_branch || 'main',
+              is_private: Boolean(r.private),
               connection_state: 'connected',
             }))
 

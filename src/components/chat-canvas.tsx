@@ -23,6 +23,7 @@ import {
   ThumbsDown,
   Sparkles,
   ChevronDown,
+  Lock,
 } from 'lucide-react'
 
 function formatModelDisplay(modelId: string): string {
@@ -510,7 +511,14 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
                 }`}
               >
                 <Image src="/logo.png" alt="" width={15} height={15} />
-                {selectedRepo ? selectedRepo.repo_name.split('/')[1] || selectedRepo.repo_name : 'Select repository'}
+                {selectedRepo ? (
+                  <span className="flex items-center gap-1.5">
+                    <span>{selectedRepo.repo_name.split('/')[1] || selectedRepo.repo_name}</span>
+                    {selectedRepo.is_private && <Lock className="h-3 w-3 text-amber-500" />}
+                  </span>
+                ) : (
+                  'Select repository'
+                )}
               </motion.button>
               {selectedRepo && (
                 <button
@@ -627,6 +635,11 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
                       ? selectedRepo.repo_name.split('/')[1] || selectedRepo.repo_name
                       : 'Select repository'}
                   </span>
+                  {selectedRepo?.is_private && (
+                    <span title="Private repository" className="inline-flex items-center text-amber-600">
+                      <Lock className="h-2.5 w-2.5" />
+                    </span>
+                  )}
                   {selectedRepo && (
                     <span className="hidden items-center gap-1 font-mono-code text-[9.5px] font-medium normal-case text-[var(--muted-foreground)] xs:inline-flex">
                       <GitBranch className="h-2.5 w-2.5" />

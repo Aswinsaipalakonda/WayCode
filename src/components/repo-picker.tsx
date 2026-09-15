@@ -2,12 +2,13 @@
 
 import { AnimatePresence, motion } from 'motion/react'
 import Image from 'next/image'
-import { FolderGit2, GitBranch, CheckCircle2, RefreshCw, X } from 'lucide-react'
+import { FolderGit2, GitBranch, CheckCircle2, RefreshCw, X, Lock } from 'lucide-react'
 
 interface Repository {
   id: string
   repo_name: string
   default_branch: string
+  is_private?: boolean
   deploy_webhook_url?: string | null
 }
 
@@ -125,7 +126,19 @@ export function RepoPicker({
                         <Image src="/logo.png" alt="" width={18} height={18} className="object-contain" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13px] font-semibold">{shortName}</span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="block truncate text-[13px] font-semibold">{shortName}</span>
+                          {repo.is_private ? (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[9.5px] font-bold text-amber-700 border border-amber-500/20">
+                              <Lock className="h-2.5 w-2.5" />
+                              Private
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 rounded-full bg-slate-500/10 px-1.5 py-0.5 text-[9.5px] font-medium text-slate-600 border border-slate-500/15">
+                              Public
+                            </span>
+                          )}
+                        </div>
                         <span className="mt-0.5 flex items-center gap-1 text-[11px] text-[var(--muted-foreground)]">
                           <GitBranch className="h-3 w-3" />
                           <span className="font-mono-code">{repo.default_branch || 'main'}</span>

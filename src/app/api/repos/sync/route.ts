@@ -36,7 +36,7 @@ export async function POST() {
   }
 
   try {
-    let repos: Array<{ full_name: string; default_branch?: string }> = []
+    let repos: Array<{ full_name: string; default_branch?: string; private?: boolean }> = []
 
     if (providerToken) {
       const ghRes = await fetch('https://api.github.com/user/repos?affiliation=owner&sort=updated&per_page=100', {
@@ -84,6 +84,7 @@ export async function POST() {
         user_id: user.id,
         repo_name: r.full_name,
         default_branch: r.default_branch || 'main',
+        is_private: Boolean(r.private),
         connection_state: 'connected',
       }))
 
@@ -91,7 +92,7 @@ export async function POST() {
       const { data: savedRepos, error: upsertError } = await supabase
         .from('repositories')
         .upsert(repoRows, { onConflict: 'user_id,repo_name' })
-        .select('id, user_id, repo_name, default_branch, connection_state')
+        .select('id, user_id, repo_name, default_branch, is_private, connection_state')
 
       if (upsertError) {
         return NextResponse.json({ error: upsertError.message }, { status: 500 })
