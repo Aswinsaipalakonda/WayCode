@@ -155,27 +155,26 @@ export function Sidebar({ onNavigate }: SidebarProps) {
                         : 'text-[var(--chrome-text-secondary)] hover:bg-white/6 hover:text-[var(--chrome-text)]'
                     }`}
                   >
-                    {repo.is_private ? (
-                      <Lock
-                        className={`h-3 w-3 shrink-0 transition-colors ${
-                          isSelected ? 'text-[#6aa5ff]' : 'text-amber-400/90'
-                        }`}
-                      />
-                    ) : (
-                      <FolderGit2
-                        className={`h-3 w-3 shrink-0 transition-colors ${
-                          isSelected ? 'text-[#6aa5ff]' : 'text-[var(--chrome-text-muted)]'
-                        }`}
-                      />
-                    )}
-                    <span className="truncate flex-1 text-xs" title={`${repo.repo_name} (${repo.is_private ? 'Private' : 'Public'})`}>
-                      {shortName}
-                    </span>
-                    {repo.is_private && (
-                      <span className="shrink-0 rounded bg-amber-400/10 px-1 py-0.5 text-[8px] font-bold uppercase tracking-wider text-amber-400/90 border border-amber-400/20">
-                        Private
+                    <FolderGit2
+                      className={`h-3.5 w-3.5 shrink-0 transition-colors ${
+                        isSelected ? 'text-[#6aa5ff]' : 'text-[var(--chrome-text-muted)] group-hover:text-[var(--chrome-text-secondary)]'
+                      }`}
+                    />
+                    <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                      <span className="truncate text-xs">
+                        {shortName}
                       </span>
-                    )}
+                      {repo.is_private && (
+                        <span title="Private repository" className="inline-flex items-center">
+                          <Lock
+                            className={`h-3 w-3 shrink-0 ${
+                              isSelected ? 'text-[#6aa5ff]' : 'text-[var(--chrome-text-muted)] group-hover:text-[var(--chrome-text)]'
+                            }`}
+                            aria-label="Private repository"
+                          />
+                        </span>
+                      )}
+                    </div>
                     {repoChats.length > 0 && (
                       <span className="shrink-0 rounded-full bg-white/6 px-1.5 py-px text-[9px] font-bold text-[var(--chrome-text-muted)]">
                         {repoChats.length}
