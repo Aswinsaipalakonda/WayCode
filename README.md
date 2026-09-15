@@ -218,5 +218,5 @@ npm run build
 WayCode is open-source software licensed under the [MIT License](LICENSE).
 
 <div align="center">
-  <sub>Built with ❤️ by <a href="https://github.com/Aswinsaipalakonda">Aswin Sai Palakonda</a> and the open-source community.</sub>
+  <sub>Built with ❤️ by <a href="https://github.com/Aswinsaipalakonda">Palakonda Aswinsai</a> and the open-source community.</sub>
 </div>
