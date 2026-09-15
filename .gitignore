@@ -43,3 +43,9 @@ next-env.d.ts
 # agent tooling (installed skills & local agent state)
 /.agents/
 /.claude/
+
+# deployment scripts & configs
+/deploy.sh
+/deploy.ps1
+/deploy/
+
