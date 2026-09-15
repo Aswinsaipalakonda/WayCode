@@ -29,6 +29,8 @@ services:
       - NODE_ENV=production
       - PORT=3000
       - HOSTNAME=0.0.0.0
+    volumes:
+      - ./public:/app/public:ro
     depends_on:
       waycode-redis:
         condition: service_healthy
