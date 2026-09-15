@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.agents
+.claude
+.gemini
+*.log
+.env.local
+.env*.local
+.sandbox

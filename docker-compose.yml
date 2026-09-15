@@ -1,0 +1,63 @@
+services:
+  waycode-redis:
+    image: redis:7-alpine
+    container_name: waycode-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - waycode_redis_data:/data
+    networks:
+      - waycode-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  waycode-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: waycode-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3020:3000"
+    env_file:
+      - .env.production
+    environment:
+      - REDIS_URL=redis://waycode-redis:6379
+      - NODE_ENV=production
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+    depends_on:
+      waycode-redis:
+        condition: service_healthy
+    networks:
+      - waycode-net
+
+  waycode-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: waycode-worker
+    restart: unless-stopped
+    command: ["npx", "tsx", "src/worker/daemon.ts"]
+    env_file:
+      - .env.production
+    environment:
+      - REDIS_URL=redis://waycode-redis:6379
+      - NODE_ENV=production
+    depends_on:
+      waycode-redis:
+        condition: service_healthy
+    networks:
+      - waycode-net
+
+networks:
+  waycode-net:
+    name: waycode-net
+    driver: bridge
+
+volumes:
+  waycode_redis_data:
+    name: waycode_redis_data
