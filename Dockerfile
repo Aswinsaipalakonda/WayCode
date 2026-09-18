@@ -1,6 +1,6 @@
 FROM node:22-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat git ca-certificates openssh-client
 
 # Install dependencies
 FROM base AS deps
@@ -33,9 +33,9 @@ ENV HOSTNAME="0.0.0.0"
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
-# Set correct permission for prerender cache
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
+# Set correct permission for prerender cache and sandbox workspace
+RUN mkdir -p .next /app/.sandbox
+RUN chown -R nextjs:nodejs .next /app/.sandbox
 
 # Automatically leverage output traces to reduce image size
 COPY --from=builder /app/public ./public
@@ -48,6 +48,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 USER nextjs
+RUN git config --global --add safe.directory "*"
 
 EXPOSE 3000
 

@@ -57,7 +57,12 @@ export interface SandboxOptions {
  * The sandbox is configured with autocrlf off so diffs stay byte-exact.
  */
 export async function createSandbox(opts: SandboxOptions): Promise<void> {
-  fs.mkdirSync(path.dirname(opts.dest), { recursive: true })
+  try {
+    fs.mkdirSync(path.dirname(opts.dest), { recursive: true })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    throw new GitAgentError(`Failed to prepare sandbox directory (${path.dirname(opts.dest)})`, msg)
+  }
   const url = opts.cloneUrlOverride ?? cloneUrlFor(opts.repoName, opts.token)
   // --config applies BEFORE checkout, so the working tree is byte-exact LF
   // regardless of the machine's global autocrlf — keeps diffs/replays stable.

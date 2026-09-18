@@ -49,6 +49,7 @@ services:
     environment:
       - REDIS_URL=redis://waycode-redis:6379
       - NODE_ENV=production
+      - WAYCODE_SANDBOX_DIR=/app/.sandbox
     depends_on:
       waycode-redis:
         condition: service_healthy

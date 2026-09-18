@@ -286,7 +286,7 @@ async function processJob(jobPayload: string) {
         log: (level, message) => writeLog(job.taskId, level, message),
         setStatus: (status, diffContent, usage) =>
           updateJobStatus(job.taskId, status, { diffContent, model, usage, userId: job.userId }),
-        sandboxRoot: path.join(process.cwd(), '.sandbox'),
+        sandboxRoot: process.env.WAYCODE_SANDBOX_DIR || path.join(process.cwd(), '.sandbox'),
         defaultBranch: repoRow?.default_branch || 'main',
         token: githubToken,
       },

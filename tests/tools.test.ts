@@ -73,4 +73,12 @@ describe('executeToolCalls (production executor)', () => {
     expect(results[0]).toContain('Successfully updated')
     expect(fs.readFileSync(path.join(sandbox, 'exec.txt'), 'utf-8')).toBe('written')
   })
+
+  it('rejects invalid sandbox paths attempting traversal', () => {
+    const results = executeToolCalls(
+      [{ tool: 'read_file', path: '../../../../etc/passwd' }],
+      sandbox,
+    )
+    expect(results[0]).toContain('escapes the sandbox')
+  })
 })
