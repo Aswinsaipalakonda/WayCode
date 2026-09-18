@@ -155,8 +155,14 @@ function makeModelCaller(apiKey: string, providerRaw: string, model: string, cus
       res = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey.trim()}`,
           'Content-Type': 'application/json',
+          ...(provider === 'openrouter'
+            ? {
+                'HTTP-Referer': 'https://waycode.aswinsai.tech',
+                'X-Title': 'WayCode',
+              }
+            : {}),
         },
         body: JSON.stringify({
           model,
@@ -172,8 +178,10 @@ function makeModelCaller(apiKey: string, providerRaw: string, model: string, cus
       res = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey.trim()}`,
           'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://waycode.aswinsai.tech',
+          'X-Title': 'WayCode',
         },
         body: JSON.stringify({
           model: fallbackModel,
@@ -185,6 +193,11 @@ function makeModelCaller(apiKey: string, providerRaw: string, model: string, cus
 
     if (!res.ok) {
       const detail = await res.text().catch(() => '')
+      if (res.status === 401 && provider === 'openrouter') {
+        throw new Error(
+          `OpenRouter API rejected this key (HTTP 401: User not found). If you generated a Management/Provisioning key, OpenRouter does not allow it for chat completions. Please create a standard API key at https://openrouter.ai/settings/keys and update it in Settings.`,
+        )
+      }
       throw new Error(`Model API error HTTP ${res.status}: ${detail.slice(0, 300)}`)
     }
 

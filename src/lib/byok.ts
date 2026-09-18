@@ -72,8 +72,7 @@ export async function validateKey(
     let res: Response
     switch (eff) {
       case 'openrouter':
-        // Dedicated account-key endpoint: cheap, unambiguous, never 404s on model churn.
-        res = await timedFetch('https://openrouter.ai/api/v1/key', {
+        res = await timedFetch('https://openrouter.ai/api/v1/auth/key', {
           headers: { Authorization: `Bearer ${apiKey}` },
         })
         break
@@ -102,6 +101,25 @@ export async function validateKey(
       const body = await res.text().catch(() => '')
       return { ok: false, latencyMs, error: humanizeHttp(res.status, body, eff) }
     }
+
+    if (eff === 'openrouter') {
+      try {
+        const json = (await res.json()) as {
+          data?: { is_management_key?: boolean; is_provisioning_key?: boolean }
+        }
+        if (json?.data?.is_management_key || json?.data?.is_provisioning_key) {
+          return {
+            ok: false,
+            latencyMs,
+            error:
+              'This is an OpenRouter Provisioning/Management key. OpenRouter only allows standard API keys for model completions. Please create a standard API key at openrouter.ai/settings/keys.',
+          }
+        }
+      } catch {
+        /* proceed */
+      }
+    }
+
     return { ok: true, latencyMs }
   } catch (e) {
     return { ok: false, error: errMessage(e) }
