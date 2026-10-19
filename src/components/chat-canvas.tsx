@@ -35,6 +35,8 @@ function formatModelDisplay(modelId: string): string {
   if (modelId.includes('gemma-4-26b')) return 'Gemma 4 26B'
   if (modelId.includes('llama-3.3-70b')) return 'Llama 3.3 70B'
   if (modelId.includes('qwen-2.5-coder')) return 'Qwen 2.5 Coder'
+  if (modelId.includes('deepseek-v4.1-flash')) return 'DeepSeek V4.1 Flash'
+  if (modelId.includes('mimo-v2.6-flash')) return 'MiMo V2.6 Flash'
   if (modelId.includes('deepseek-r1')) return 'DeepSeek R1'
   if (modelId.includes('north-mini-code')) return 'Cohere North'
   if (modelId.includes('claude-3-5-sonnet')) return 'Claude 3.5 Sonnet'

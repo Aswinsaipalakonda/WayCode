@@ -113,6 +113,8 @@ interface UserSettingsRow {
 function chatEndpointFor(provider: EffectiveProvider, customBaseUrl: string | null, apiKey?: string): string {
   const base = resolveBaseUrl(apiKey, customBaseUrl)
   switch (provider) {
+    case 'tokenharbor':
+      return 'https://tokenharbor.ai/v1/chat/completions'
     case 'gemini':
       return 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
     case 'anthropic':

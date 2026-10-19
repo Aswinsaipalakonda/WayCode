@@ -35,7 +35,7 @@ interface SettingsDrawerProps {
   onClose: () => void
 }
 
-type Provider = 'openrouter' | 'gemini' | 'custom'
+type Provider = 'openrouter' | 'gemini' | 'tokenharbor' | 'custom'
 type VaultStage = 'idle' | 'validating' | 'connected' | 'error'
 
 interface ProviderMeta {
@@ -57,6 +57,14 @@ const PROVIDERS: ProviderMeta[] = [
     Icon: SiOpenrouter,
   },
   {
+    id: 'tokenharbor',
+    label: 'TokenHarbor (Free)',
+    hint: 'Free DeepSeek V4.1 Flash, MiMo V2.6 with 1M context (thk_... key)',
+    color: '#00d26a',
+    tint: 'rgba(0, 210, 106, 0.12)',
+    Icon: TbApi,
+  },
+  {
     id: 'gemini',
     label: 'Google Gemini API',
     hint: 'Direct Google AI Studio billing (AIza... key)',
@@ -76,6 +84,7 @@ const PROVIDERS: ProviderMeta[] = [
 
 const KEY_PLACEHOLDER: Record<Provider, string> = {
   openrouter: 'sk-or-v1-…',
+  tokenharbor: 'thk_live_… (No Base URL needed)',
   gemini: 'AIza…',
   custom: 'sk-ant-… · sk-… · any OpenAI-compatible key',
 }
@@ -105,6 +114,20 @@ const QUICK_PICKS: Record<Provider, Array<{ id: string; label: string; tag: stri
       label: 'Google Gemma 4 26B (Free)',
       tag: '100% FREE',
       desc: 'Fast Google open weights model with low token latency.',
+    },
+  ],
+  tokenharbor: [
+    {
+      id: 'deepseek-v4.1-flash:free',
+      label: 'DeepSeek V4.1 Flash (Free)',
+      tag: '100% FREE · 1.05M CONTEXT',
+      desc: 'Top-tier code and reasoning model with 1.05M context window and 128k output tokens.',
+    },
+    {
+      id: 'mimo-v2.6-flash:free',
+      label: 'MiMo V2.6 Flash (Free)',
+      tag: '100% FREE · 1.05M CONTEXT',
+      desc: 'Multimodal vision and text model with 1.05M context and ultra-fast generation.',
     },
   ],
   gemini: [
@@ -158,6 +181,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
   const [provider, setProvider] = useState<Provider>('openrouter')
   const [credentials, setCredentials] = useState<Record<Provider, { apiKey: string; baseUrl: string }>>({
     openrouter: { apiKey: '', baseUrl: '' },
+    tokenharbor: { apiKey: '', baseUrl: 'https://tokenharbor.ai/v1' },
     gemini: { apiKey: '', baseUrl: '' },
     custom: { apiKey: '', baseUrl: '' },
   })
@@ -609,6 +633,7 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
         setCredentials((prev) => ({
           openrouter: { apiKey: '', baseUrl: prev.openrouter.baseUrl },
           gemini: { apiKey: '', baseUrl: prev.gemini.baseUrl },
+          tokenharbor: { apiKey: '', baseUrl: prev.tokenharbor?.baseUrl || 'https://tokenharbor.ai/v1' },
           custom: { apiKey: '', baseUrl: prev.custom.baseUrl },
         }))
         setStage('idle')
@@ -826,11 +851,27 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                       </p>
                     </div>
                   )}
+
+                  {/* Contextual guidance when switching to TokenHarbor */}
+                  {provider === 'tokenharbor' && (!savedVault?.hasKey || savedVault.provider !== 'tokenharbor') && (
+                    <div className="mt-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-[11px] text-emerald-950">
+                      <div className="flex items-center gap-1.5 font-bold text-emerald-700">
+                        <TbBolt className="h-3.5 w-3.5" />
+                        TokenHarbor Free Models (Direct Connection)
+                      </div>
+                      <p className="mt-1 text-[10.5px] leading-relaxed text-emerald-900/80">
+                        Paste your TokenHarbor key (<code className="font-mono-code font-semibold">thk_live_...</code>) below. We connect directly to <code className="font-mono-code">https://tokenharbor.ai/v1</code> — <strong>no Base URL needed</strong>.
+                      </p>
+                      <p className="mt-1.5 text-[10px] text-emerald-700 font-medium">
+                        ⭐ <strong>Free models:</strong> Use <strong>DeepSeek V4.1 Flash (1.05M context)</strong> or <strong>MiMo V2.6 Flash</strong> with 100% free tokens. Make sure your email is verified at tokenharbor.ai!
+                      </p>
+                    </div>
+                  )}
                 </section>
 
                 {/* Custom base URL */}
                 <AnimatePresence initial={false}>
-                  {provider === 'custom' && (
+                  {provider === 'custom' && !apiKey.trim().startsWith('thk_') && (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: 'auto', opacity: 1 }}

@@ -4,7 +4,7 @@
  * model-catalog fetching across OpenRouter / Gemini / Anthropic / custom.
  */
 
-export type EffectiveProvider = 'openrouter' | 'gemini' | 'anthropic' | 'custom'
+export type EffectiveProvider = 'openrouter' | 'gemini' | 'anthropic' | 'tokenharbor' | 'custom'
 
 export interface ModelEntry {
   id: string
@@ -33,13 +33,10 @@ export function resolveProvider(
   baseUrl?: string | null,
 ): EffectiveProvider {
   const k = (apiKey || '').trim()
-  // Claude keys are unmistakable — honor them regardless of the chosen card.
   if (k.startsWith('sk-ant-')) return 'anthropic'
-  if (provider === 'gemini') return 'gemini'
-  if (provider === 'openrouter') return 'openrouter'
-  // Custom card: empty base URL + an OpenRouter-shaped key still routes to OpenRouter.
-  if (!baseUrl && k.startsWith('sk-or-')) return 'openrouter'
-  if (k.startsWith('AIza')) return 'gemini'
+  if (provider === 'gemini' || k.startsWith('AIza')) return 'gemini'
+  if (provider === 'tokenharbor' || k.startsWith('thk_')) return 'tokenharbor'
+  if (provider === 'openrouter' || (!baseUrl && k.startsWith('sk-or-'))) return 'openrouter'
   return 'custom'
 }
 
@@ -55,9 +52,24 @@ function errMessage(e: unknown): string {
 }
 
 function humanizeHttp(status: number, body: string, eff: EffectiveProvider): string {
+  try {
+    const json = JSON.parse(body)
+    const msg = json?.error?.message || json?.message || json?.error
+    if (typeof msg === 'string' && msg.trim()) {
+      if (json?.error?.code === 'email_verification_required' || /verify your email/i.test(msg)) {
+        return `TokenHarbor verification required: ${msg}`
+      }
+      return msg.slice(0, 200)
+    }
+  } catch {
+    /* fallback to status */
+  }
+
   if (status === 401 || status === 403) return 'Invalid or unauthorized API key'
   if (status === 429) return 'Rate limited by the provider — retry in a moment'
-  if (status === 404 && eff === 'custom') return 'Endpoint not found — check the Base URL (must expose /models)'
+  if (status === 404 && (eff === 'custom' || eff === 'tokenharbor')) {
+    return 'Endpoint not found — check the Base URL (must expose /models)'
+  }
   const snippet = body.replace(/\s+/g, ' ').slice(0, 140)
   return `HTTP ${status}${snippet ? `: ${snippet}` : ''}`
 }
@@ -96,6 +108,11 @@ export async function validateKey(
       case 'anthropic':
         res = await timedFetch('https://api.anthropic.com/v1/models?limit=1', {
           headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        })
+        break
+      case 'tokenharbor':
+        res = await timedFetch('https://tokenharbor.ai/v1/models', {
+          headers: { Authorization: `Bearer ${apiKey.trim()}` },
         })
         break
       case 'custom': {
@@ -208,6 +225,28 @@ export async function fetchCatalog(
         if (!res.ok) return { models: [], total: 0, free: 0, error: humanizeHttp(res.status, await res.text().catch(() => ''), eff) }
         const j = (await res.json()) as { data?: Array<{ id: string; display_name?: string }> }
         raw = (j.data ?? []).map((m) => ({ id: m.id, name: m.display_name || m.id, free: false }))
+        break
+      }
+      case 'tokenharbor': {
+        const res = await timedFetch('https://tokenharbor.ai/v1/models', {
+          headers: { Authorization: `Bearer ${apiKey.trim()}` },
+        })
+        if (!res.ok) {
+          const body = await res.text().catch(() => '')
+          return { models: [], total: 0, free: 0, error: humanizeHttp(res.status, body, eff) }
+        }
+        const j = (await res.json()) as { data?: Array<{ id: string; name?: string; pricing?: { prompt?: string } }> }
+        raw = (j.data ?? []).map((m) => ({
+          id: m.id,
+          name: m.name || m.id,
+          free: m.id.endsWith(':free') || m.id.includes(':free') || m.id.includes('free') || Number(m.pricing?.prompt ?? '1') === 0,
+        }))
+        if (!raw.some((m) => m.id === 'deepseek-v4.1-flash:free')) {
+          raw.unshift({ id: 'deepseek-v4.1-flash:free', name: 'DeepSeek V4.1 Flash (Free)', free: true })
+        }
+        if (!raw.some((m) => m.id === 'mimo-v2.6-flash:free')) {
+          raw.push({ id: 'mimo-v2.6-flash:free', name: 'MiMo V2.6 Flash (Free)', free: true })
+        }
         break
       }
       case 'custom': {

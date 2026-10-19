@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { encryptSecret, decryptSecret } from '@/lib/crypto'
 import { NextResponse } from 'next/server'
 
-const VALID_PROVIDERS = new Set(['openrouter', 'gemini', 'custom'])
+const VALID_PROVIDERS = new Set(['openrouter', 'gemini', 'tokenharbor', 'custom'])
 
 export async function POST(request: Request) {
   try {
