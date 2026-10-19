@@ -88,7 +88,7 @@ export async function createSandbox(opts: SandboxOptions): Promise<void> {
  */
 export async function generateWorkingDiff(sandboxDir: string): Promise<string> {
   await runGit(['add', '-A'], sandboxDir)
-  const diff = await runGit(['diff', '--cached'], sandboxDir)
+  const diff = await runGit(['diff', '--cached', '--binary'], sandboxDir)
   // NOTE: never trim the tail — git apply requires the patch to end with a newline.
   return diff
 }
@@ -129,7 +129,7 @@ export async function landApprovedDiff(opts: LandOptions): Promise<{ pushedBranc
   await new Promise<void>((resolve, reject) => {
     const child = execFile(
       'git',
-      ['apply', '--whitespace=nowarn', '-'],
+      ['apply', '--binary', '--whitespace=nowarn', '-'],
       { cwd: opts.dest, timeout: GIT_TIMEOUT, maxBuffer: GIT_MAX_BUFFER, windowsHide: true },
       (err) => (err ? reject(new GitAgentError('git apply failed', String(err))) : resolve()),
     )

@@ -14,6 +14,18 @@ export interface ModelEntry {
 
 const TIMEOUT_MS = 15_000
 
+/** Resolve the effective API base URL, defaulting known key shapes (TokenHarbor, OpenAI, etc.) when omitted. */
+export function resolveBaseUrl(apiKey?: string, baseUrl?: string | null): string {
+  const b = (baseUrl || '').trim().replace(/\/+$/, '')
+  if (b) return b
+  const k = (apiKey || '').trim()
+  if (k.startsWith('thk_')) return 'https://tokenharbor.ai/v1'
+  if (k.startsWith('sk-ant-')) return 'https://api.anthropic.com/v1'
+  if (k.startsWith('sk-or-')) return 'https://openrouter.ai/api/v1'
+  if (k.startsWith('sk-')) return 'https://api.openai.com/v1'
+  return ''
+}
+
 /** Infer the real upstream provider from the selected card + the key's own shape. */
 export function resolveProvider(
   provider: string,
@@ -87,7 +99,7 @@ export async function validateKey(
         })
         break
       case 'custom': {
-        const base = (baseUrl || '').replace(/\/+$/, '')
+        const base = resolveBaseUrl(apiKey, baseUrl)
         if (!base) return { ok: false, error: 'Base URL is required for custom endpoints' }
         res = await timedFetch(`${base}/models`, {
           headers: { Authorization: `Bearer ${apiKey}` },
@@ -199,14 +211,18 @@ export async function fetchCatalog(
         break
       }
       case 'custom': {
-        const base = (baseUrl || '').replace(/\/+$/, '')
+        const base = resolveBaseUrl(apiKey, baseUrl)
         if (!base) return { models: [], total: 0, free: 0, error: 'Base URL is required for custom endpoints' }
         const res = await timedFetch(`${base}/models`, {
           headers: { Authorization: `Bearer ${apiKey}` },
         })
         if (!res.ok) return { models: [], total: 0, free: 0, error: humanizeHttp(res.status, await res.text().catch(() => ''), eff) }
-        const j = (await res.json()) as { data?: Array<{ id: string }> }
-        raw = (j.data ?? []).map((m) => ({ id: m.id, name: m.id, free: false }))
+        const j = (await res.json()) as { data?: Array<{ id: string; name?: string; pricing?: { prompt?: string } }> }
+        raw = (j.data ?? []).map((m) => ({
+          id: m.id,
+          name: m.name || m.id,
+          free: m.id.endsWith(':free') || m.id.includes(':free') || m.id.includes('free') || Number(m.pricing?.prompt ?? '1') === 0,
+        }))
         break
       }
     }

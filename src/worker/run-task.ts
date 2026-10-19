@@ -3,11 +3,18 @@ import path from 'path'
 import { createSandbox, generateWorkingDiff, GitAgentError } from '../lib/git-agent'
 import { edit_file, list_files, read_file, run_syntax_check } from './tools'
 
+export interface UploadedFile {
+  name: string
+  content: string
+  encoding?: 'utf-8' | 'base64'
+}
+
 export interface TaskContext {
   filePath?: string
   issueNumber?: number
   issueReference?: string | null
   errorStack?: string
+  files?: UploadedFile[]
 }
 
 export interface TaskJob {
@@ -190,12 +197,34 @@ export function executeToolCalls(calls: ToolCall[], sandboxDir: string): string[
 export function formatContextBlock(ctx?: TaskContext | null): string {
   if (!ctx) return ''
   const parts: string[] = []
+  if (ctx.files && ctx.files.length > 0) {
+    parts.push(`- Uploaded files available in repository workspace: ${ctx.files.map((f) => f.name).join(', ')}`)
+  }
   if (ctx.filePath) parts.push(`- Relevant file path: ${ctx.filePath}`)
   if (ctx.issueReference) parts.push(`- Linked issue: ${ctx.issueReference}`)
   else if (ctx.issueNumber) parts.push(`- Linked GitHub issue: #${ctx.issueNumber}`)
   if (ctx.errorStack) parts.push(`- Pasted error output:\n<error>\n${ctx.errorStack}\n</error>`)
   if (parts.length === 0) return ''
   return `\n\nContext attachments:\n${parts.join('\n')}`
+}
+
+/** Compact older tool execution results to prevent context window starvation on free/small models. */
+export function compactMessageHistory(messages: ChatMessage[], maxTurnsToKeepFull = 2): ChatMessage[] {
+  if (messages.length <= 4) return messages
+  const cutoff = Math.max(2, messages.length - (maxTurnsToKeepFull * 2))
+  return messages.map((msg, idx) => {
+    if (idx < 2 || idx >= cutoff) return msg
+    if (msg.role === 'user' && msg.content.startsWith('TOOL RESULTS:')) {
+      const lines = msg.content.split('\n')
+      if (lines.length > 25) {
+        return {
+          role: 'user',
+          content: `${lines.slice(0, 15).join('\n')}\n... [earlier tool output truncated to maintain context window] ...\n${lines.slice(-5).join('\n')}`,
+        }
+      }
+    }
+    return msg
+  })
 }
 
 export async function runTask(job: TaskJob, deps: RunTaskDeps): Promise<void> {
@@ -213,6 +242,27 @@ export async function runTask(job: TaskJob, deps: RunTaskDeps): Promise<void> {
       cloneUrlOverride: deps.cloneUrlOverride,
     })
     await deps.log('success', 'Repository cloned — working branch created.')
+
+    // Unpack any uploaded files into the sandbox workspace
+    if (job.context?.files && job.context.files.length > 0) {
+      for (const file of job.context.files) {
+        try {
+          const target = path.join(sandboxDir, file.name)
+          fs.mkdirSync(path.dirname(target), { recursive: true })
+          if (file.encoding === 'base64') {
+            fs.writeFileSync(target, Buffer.from(file.content, 'base64'))
+          } else {
+            fs.writeFileSync(target, file.content, 'utf-8')
+          }
+          await deps.log('info', `Placed uploaded file into workspace: ${file.name}`)
+        } catch (err: unknown) {
+          await deps.log(
+            'warning',
+            `Failed writing uploaded file ${file.name}: ${err instanceof Error ? err.message : String(err)}`,
+          )
+        }
+      }
+    }
 
     const files = list_files(sandboxDir)
     await deps.log('info', `Scanned repository structure — ${files.length} file(s) in scope.`)
@@ -240,13 +290,39 @@ export async function runTask(job: TaskJob, deps: RunTaskDeps): Promise<void> {
         await deps.log('info', `Evaluating implementation state (step ${turn} of ${MAX_MODEL_TURNS})…`)
       }
 
-      const { text: raw, usage } = await deps.model(messages)
+      const outgoingMessages = compactMessageHistory(messages)
+      let { text: raw, usage } = await deps.model(outgoingMessages)
       usageTotal.input += usage.input
       usageTotal.output += usage.output
 
       if (!raw.trim()) {
-        await deps.log('error', 'The model returned an empty response.')
-        break
+        let recovered = false
+        for (let retry = 1; retry <= 2; retry++) {
+          await deps.log('warning', `Empty response from model — retrying with compacted context (${retry}/2)…`)
+          await new Promise((r) => setTimeout(r, 1500 * retry))
+          const retryMessages = compactMessageHistory(messages, 1)
+          retryMessages.push({
+            role: 'user',
+            content: 'Your previous response was empty. Please continue immediately by replying with the JSON array of tool calls.',
+          })
+          const retryCall = await deps.model(retryMessages)
+          if (retryCall.text.trim()) {
+            raw = retryCall.text
+            usageTotal.input += retryCall.usage.input
+            usageTotal.output += retryCall.usage.output
+            recovered = true
+            break
+          }
+        }
+
+        if (!recovered) {
+          if (modelEdits > 0) {
+            await deps.log('warning', 'Model completed modifications before stopping — proceeding to validation.')
+            break
+          }
+          await deps.log('error', 'The model returned an empty response after retries.')
+          break
+        }
       }
 
       messages.push({ role: 'assistant', content: raw })

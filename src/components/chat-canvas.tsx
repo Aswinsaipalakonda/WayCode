@@ -83,6 +83,15 @@ interface HydratedTaskRow {
 
 const MAX_LEN = 2000
 
+export interface AttachedFile {
+  id: string
+  name: string
+  size: number
+  type: string
+  content: string
+  encoding: 'utf-8' | 'base64'
+}
+
 /** Optional intent attachments (PRD §7.3). */
 interface ContextDraft {
   filePath: string
@@ -140,10 +149,66 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showAttachments, setShowAttachments] = useState(false)
   const [contextDraft, setContextDraft] = useState<ContextDraft>(EMPTY_CONTEXT)
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([])
+  const [isDragging, setIsDragging] = useState(false)
   const [hasWhatsApp, setHasWhatsApp] = useState<boolean | null>(null)
   const [activeModel, setActiveModel] = useState<string>('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileSelect = useCallback((files: FileList | File[]) => {
+    const list = Array.from(files)
+    if (list.length === 0) return
+
+    for (const file of list) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.warning('File too large', {
+          description: `${file.name} exceeds the 10MB limit.`,
+        })
+        continue
+      }
+
+      const reader = new FileReader()
+      const isText =
+        file.type.startsWith('text/') ||
+        /\.(txt|md|json|ts|tsx|js|jsx|html|css|py|sh|yaml|yml|sql|env|xml|csv)$/i.test(file.name)
+
+      if (isText) {
+        reader.onload = () => {
+          setAttachedFiles((prev) => [
+            ...prev.filter((f) => f.name !== file.name),
+            {
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              name: file.name,
+              size: file.size,
+              type: file.type || 'text/plain',
+              content: (reader.result as string) || '',
+              encoding: 'utf-8',
+            },
+          ])
+        }
+        reader.readAsText(file)
+      } else {
+        reader.onload = () => {
+          const resultStr = (reader.result as string) || ''
+          const base64 = resultStr.includes(',') ? resultStr.split(',')[1] : resultStr
+          setAttachedFiles((prev) => [
+            ...prev.filter((f) => f.name !== file.name),
+            {
+              id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              name: file.name,
+              size: file.size,
+              type: file.type || 'application/octet-stream',
+              content: base64,
+              encoding: 'base64',
+            },
+          ])
+        }
+        reader.readAsDataURL(file)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     let ignore = false
@@ -370,7 +435,22 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
     setPrompt('')
     if (textareaRef.current) textareaRef.current.style.height = 'auto'
     setIsSubmitting(true)
-    const context = contextFromDraft(contextDraft)
+    const draftContext = contextFromDraft(contextDraft)
+    const context =
+      draftContext || attachedFiles.length > 0
+        ? {
+            ...(draftContext || {}),
+            ...(attachedFiles.length > 0
+              ? {
+                  files: attachedFiles.map((f) => ({
+                    name: f.name,
+                    content: f.content,
+                    encoding: f.encoding,
+                  })),
+                }
+              : {}),
+          }
+        : null
     setShowAttachments(false)
 
     try {
@@ -392,6 +472,7 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
 
       if (res.status === 202 && data.success) {
         setContextDraft(EMPTY_CONTEXT)
+        setAttachedFiles([])
         setMessages((prev) => [
           ...prev,
           {
@@ -614,7 +695,23 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
               e.preventDefault()
               handleSubmit()
             }}
-            className="rounded-[28px] border border-white/70 bg-white/75 p-3 shadow-[var(--shadow-composer)] backdrop-blur-xl transition-shadow duration-300 focus-within:border-white focus-within:shadow-[0_18px_54px_-18px_rgba(10,102,255,0.35),0_2px_10px_-3px_rgba(26,30,40,0.08)]"
+            onDragOver={(e) => {
+              e.preventDefault()
+              setIsDragging(true)
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setIsDragging(false)
+              }
+            }}
+            onDrop={(e) => {
+              e.preventDefault()
+              setIsDragging(false)
+              if (e.dataTransfer.files) handleFileSelect(e.dataTransfer.files)
+            }}
+            className={`rounded-[28px] border bg-white/75 p-3 shadow-[var(--shadow-composer)] backdrop-blur-xl transition-all duration-300 focus-within:border-white focus-within:shadow-[0_18px_54px_-18px_rgba(10,102,255,0.35),0_2px_10px_-3px_rgba(26,30,40,0.08)] ${
+              isDragging ? 'border-[var(--brand)] bg-[var(--brand-soft)]/30 ring-2 ring-[var(--brand)]/20' : 'border-white/70'
+            }`}
           >
             {/* Repository chip & WhatsApp alert status */}
             <div className="mb-2 flex flex-wrap items-center justify-between gap-1.5">
@@ -754,6 +851,45 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
               )}
             </AnimatePresence>
 
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={(e) => {
+                if (e.target.files) handleFileSelect(e.target.files)
+                e.target.value = ''
+              }}
+              className="hidden"
+            />
+
+            {/* Attached file chips */}
+            {attachedFiles.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5 px-0.5">
+                {attachedFiles.map((file) => (
+                  <div
+                    key={file.id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-black/[0.08] bg-white/90 px-3 py-1 shadow-2xs backdrop-blur-xs transition-all"
+                  >
+                    <FileText className="h-3.5 w-3.5 text-[var(--brand)]" />
+                    <span className="max-w-[150px] truncate text-[11px] font-semibold text-[var(--foreground)]" title={file.name}>
+                      {file.name}
+                    </span>
+                    <span className="font-mono-code text-[9.5px] text-[var(--muted-foreground)]">
+                      {(file.size / 1024).toFixed(0)} KB
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAttachedFiles((prev) => prev.filter((f) => f.id !== file.id))}
+                      aria-label={`Remove ${file.name}`}
+                      className="pressable rounded-full p-0.5 text-[var(--muted-foreground)] hover:bg-black/10 hover:text-[var(--foreground)]"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <textarea
               ref={textareaRef}
               value={prompt}
@@ -769,20 +905,36 @@ function ChatThread({ conversation }: { conversation?: ConversationRef }) {
             />
 
             <div className="mt-2 flex items-center justify-between pl-0.5 pr-0.5">
-              <button
-                type="button"
-                onClick={() => setShowAttachments((v) => !v)}
-                aria-expanded={showAttachments}
-                aria-label="Attach context"
-                title="Attach context (file, issue, stack trace)"
-                className={`pressable rounded-full p-2 ${
-                  hasContextDraft(contextDraft)
-                    ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
-                    : 'text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]'
-                }`}
-              >
-                <Paperclip className="h-[18px] w-[18px]" />
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  aria-label="Upload files"
+                  title="Upload files to repository (e.g. PDF, image, code)"
+                  className={`pressable rounded-full p-2 transition-colors ${
+                    attachedFiles.length > 0
+                      ? 'bg-[var(--brand-soft)] text-[var(--brand)]'
+                      : 'text-[var(--muted-foreground)] hover:bg-[var(--brand-soft)] hover:text-[var(--brand)]'
+                  }`}
+                >
+                  <Paperclip className="h-[18px] w-[18px]" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAttachments((v) => !v)}
+                  aria-expanded={showAttachments}
+                  aria-label="Add issue or stack trace context"
+                  title="Add GitHub Issue # or Error Stack context"
+                  className={`pressable inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10.5px] font-semibold transition-colors ${
+                    hasContextDraft(contextDraft)
+                      ? 'border border-[var(--brand)]/30 bg-[var(--brand-soft)] text-[var(--brand)]'
+                      : 'border border-black/[0.06] text-[var(--muted-foreground)] hover:border-black/15 hover:text-[var(--foreground)]'
+                  }`}
+                >
+                  <span>+ Issue / Stack</span>
+                </button>
+              </div>
 
               <div className="flex items-center gap-2">
                 {/* Active Model Selector Pill — displays chosen model & opens settings on tap */}

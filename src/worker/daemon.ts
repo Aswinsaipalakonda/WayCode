@@ -2,7 +2,7 @@ import path from 'path'
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import Redis from 'ioredis'
 import { decryptSecret } from '../lib/crypto'
-import { resolveProvider, type EffectiveProvider } from '../lib/byok'
+import { resolveProvider, resolveBaseUrl, type EffectiveProvider } from '../lib/byok'
 import { sendPushToUser } from '../lib/push'
 import { sendReviewWhatsAppAlert } from '../lib/deploy-notify'
 import { runTask, type ChatMessage, type ModelCaller, type TaskContext } from './run-task'
@@ -110,14 +110,15 @@ interface UserSettingsRow {
   github_token: string | null
 }
 
-function chatEndpointFor(provider: EffectiveProvider, customBaseUrl: string | null): string {
-  const base = (customBaseUrl || '').replace(/\/+$/, '')
+function chatEndpointFor(provider: EffectiveProvider, customBaseUrl: string | null, apiKey?: string): string {
+  const base = resolveBaseUrl(apiKey, customBaseUrl)
   switch (provider) {
     case 'gemini':
       return 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
     case 'anthropic':
       return 'https://api.anthropic.com/v1/messages'
     case 'custom':
+      if (!base) return 'https://openrouter.ai/api/v1/chat/completions'
       return base.endsWith('/chat/completions') ? base : `${base}/chat/completions`
     case 'openrouter':
     default:
@@ -127,7 +128,7 @@ function chatEndpointFor(provider: EffectiveProvider, customBaseUrl: string | nu
 
 function makeModelCaller(apiKey: string, providerRaw: string, model: string, customBaseUrl: string | null): ModelCaller {
   const provider = resolveProvider(providerRaw, apiKey, customBaseUrl)
-  const endpoint = chatEndpointFor(provider, customBaseUrl)
+  const endpoint = chatEndpointFor(provider, customBaseUrl, apiKey)
 
   return async (messages: ChatMessage[]) => {
     let res: Response
@@ -217,10 +218,21 @@ function makeModelCaller(apiKey: string, providerRaw: string, model: string, cus
     }
 
     const data = (await res.json()) as {
-      choices?: Array<{ message?: { content?: string } }>
+      choices?: Array<{
+        message?: { content?: string; reasoning_content?: string; reasoning?: string }
+        delta?: { content?: string }
+        text?: string
+      }>
       usage?: { prompt_tokens?: number; completion_tokens?: number }
     }
-    const text = data.choices?.[0]?.message?.content ?? ''
+    const choice = data.choices?.[0]
+    const text =
+      choice?.message?.content ??
+      choice?.message?.reasoning_content ??
+      choice?.message?.reasoning ??
+      choice?.delta?.content ??
+      choice?.text ??
+      ''
     return {
       text,
       usage: {

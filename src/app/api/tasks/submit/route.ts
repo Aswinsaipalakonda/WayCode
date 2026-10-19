@@ -1,3 +1,4 @@
+import path from 'path'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { decryptSecret } from '@/lib/crypto'
@@ -13,11 +14,18 @@ const MAX_ACTIVE_JOBS = 10
 const MAX_FILE_PATH_CHARS = 512
 const MAX_ERROR_STACK_CHARS = 4000
 
+interface UploadedFile {
+  name: string
+  content: string
+  encoding?: 'utf-8' | 'base64'
+}
+
 interface TaskContext {
   filePath?: string
   issueNumber?: number
   issueReference?: string | null
   errorStack?: string
+  files?: UploadedFile[]
 }
 
 /** Best-effort fetch of a GitHub issue's body so the agent gets real content,
@@ -80,6 +88,7 @@ export async function POST(request: Request) {
           filePath?: string
           issueNumber?: number | string
           errorStack?: string
+          files?: Array<{ name: string; content: string; encoding?: 'utf-8' | 'base64' }>
         }
       }
 
@@ -117,11 +126,31 @@ export async function POST(request: Request) {
       const errorStack = typeof context.errorStack === 'string' ? context.errorStack.trim().slice(0, MAX_ERROR_STACK_CHARS) : ''
       const issueNumber = Number.parseInt(String(context.issueNumber ?? ''), 10)
 
-      if (filePath || errorStack || Number.isFinite(issueNumber)) {
+      const files: UploadedFile[] = []
+      if (Array.isArray(context.files)) {
+        for (const f of context.files) {
+          if (f && typeof f.name === 'string' && typeof f.content === 'string') {
+            // Cap at 10MB per file string
+            if (f.content.length <= 10 * 1024 * 1024) {
+              const safeName = path.basename(f.name.replace(/\\/g, '/')).slice(0, 120)
+              if (safeName && safeName !== '.' && safeName !== '..') {
+                files.push({
+                  name: safeName,
+                  content: f.content,
+                  encoding: f.encoding === 'base64' ? 'base64' : 'utf-8',
+                })
+              }
+            }
+          }
+        }
+      }
+
+      if (filePath || errorStack || Number.isFinite(issueNumber) || files.length > 0) {
         taskContext = {
           ...(filePath ? { filePath } : {}),
           ...(Number.isFinite(issueNumber) && issueNumber > 0 ? { issueNumber } : {}),
           ...(errorStack ? { errorStack } : {}),
+          ...(files.length > 0 ? { files } : {}),
         }
       }
     }

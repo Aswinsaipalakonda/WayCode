@@ -844,13 +844,13 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                         </legend>
                         <input
                           type="url"
-                          placeholder="https://api.your-provider.com/v1"
+                          placeholder="https://api.your-provider.com/v1 (e.g. https://tokenharbor.ai/v1)"
                           value={baseUrl}
                           onChange={(e) => updateCredentials({ baseUrl: e.target.value })}
                           className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 font-mono-code text-xs text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] outline-none transition-all duration-200 focus:border-[var(--brand)] focus:shadow-[0_0_0_3px_var(--brand-soft)]"
                         />
                         <p className="text-[10px] text-[var(--muted-foreground)]">
-                          Leave empty when pasting an Anthropic (<code className="font-mono-code">sk-ant-</code>) or OpenRouter key — we detect it automatically.
+                          Optional for TokenHarbor (<code className="font-mono-code">thk_</code>), Anthropic (<code className="font-mono-code">sk-ant-</code>), or OpenRouter keys — we detect and route them automatically.
                         </p>
                       </fieldset>
                     </motion.div>
@@ -954,11 +954,31 @@ export function SettingsDrawer({ isOpen, onClose }: SettingsDrawerProps) {
                   <SectionLabel
                     icon={<TbCpu className="h-3 w-3" />}
                     aside={
-                      catalog.length > 0 ? (
-                        <span className="normal-case tracking-normal font-semibold text-[var(--muted-foreground)]">
-                          {catalogMeta.free} free · {catalogMeta.total} total
-                        </span>
-                      ) : undefined
+                      <div className="flex items-center gap-2">
+                        {catalog.length > 0 && (
+                          <span className="hidden xs:inline normal-case tracking-normal font-semibold text-[var(--muted-foreground)]">
+                            {catalogMeta.free} free · {catalogMeta.total} total
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (stage === 'connected' || savedVault?.hasKey) {
+                              loadVaultModels()
+                            } else if (apiKey) {
+                              loadModels(apiKey, baseUrl)
+                            } else {
+                              loadVaultModels()
+                            }
+                          }}
+                          disabled={loadingModels}
+                          className="pressable inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1 text-[11px] font-bold text-[var(--foreground)] hover:border-[var(--brand)] hover:text-[var(--brand)] transition-all duration-200 disabled:opacity-50"
+                          title="Refresh available models from the provider"
+                        >
+                          <TbRefresh className={`h-3.5 w-3.5 ${loadingModels ? 'animate-spin text-[var(--brand)]' : ''}`} />
+                          Fetch Models
+                        </button>
+                      </div>
                     }
                   >
                     Model Routing
