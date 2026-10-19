@@ -14,6 +14,7 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Non-app tooling directories:
     ".agents/**",
+    ".kilo/**",
     "supabase/**",
     "design-system/**",
   ]),

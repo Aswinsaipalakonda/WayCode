@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import Image from 'next/image'
 import { useGitHubAuth } from '@/lib/auth/github'
 import { GithubIcon } from '@/components/icons'
 
@@ -328,7 +327,6 @@ export function Landing() {
 
   // Editorial Steps Carousel
   const [currentStep, setCurrentStep] = useState(1)
-  const [slideDir, setSlideDir] = useState<'left' | 'right'>('right')
   const [isHoveringEditorial, setIsHoveringEditorial] = useState(false)
 
   // Lightbox Modal
@@ -389,7 +387,6 @@ export function Landing() {
   useEffect(() => {
     if (isHoveringEditorial || lightboxImg) return
     const timer = setInterval(() => {
-      setSlideDir('right')
       setCurrentStep((prev) => (prev >= 9 ? 1 : prev + 1))
     }, 4000)
     return () => clearInterval(timer)
@@ -405,12 +402,10 @@ export function Landing() {
   }, [isHoveringScenario])
 
   const nextEditorial = () => {
-    setSlideDir('right')
     setCurrentStep((prev) => (prev >= 9 ? 1 : prev + 1))
   }
 
   const prevEditorial = () => {
-    setSlideDir('left')
     setCurrentStep((prev) => (prev <= 1 ? 9 : prev - 1))
   }
 
@@ -1050,7 +1045,6 @@ export function Landing() {
                       <button
                         key={num}
                         onClick={() => {
-                          setSlideDir(num > currentStep ? 'right' : 'left')
                           setCurrentStep(num)
                         }}
                         className={`px-5 py-4 text-xs font-bold whitespace-nowrap border-b-2 transition-all duration-200 ${

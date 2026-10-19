@@ -43,6 +43,7 @@ next-env.d.ts
 # agent tooling (installed skills & local agent state)
 /.agents/
 /.claude/
+/.kilo/
 
 # deployment scripts & configs
 /deploy.sh

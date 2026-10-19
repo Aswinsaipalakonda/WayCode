@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
 import { toast } from 'sonner'
-import { Plus, History, RefreshCw, ChevronRight, MessageSquare, Settings2, Circle, Lock, FolderGit2 } from 'lucide-react'
+import { Plus, History, RefreshCw, ChevronRight, MessageSquare, Settings2, Lock, FolderGit2 } from 'lucide-react'
 import { useAppChrome } from '@/components/app-chrome'
 
 interface SidebarProps {

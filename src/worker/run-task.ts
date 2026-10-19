@@ -291,7 +291,8 @@ export async function runTask(job: TaskJob, deps: RunTaskDeps): Promise<void> {
       }
 
       const outgoingMessages = compactMessageHistory(messages)
-      let { text: raw, usage } = await deps.model(outgoingMessages)
+      const { text: initialText, usage } = await deps.model(outgoingMessages)
+      let raw = initialText
       usageTotal.input += usage.input
       usageTotal.output += usage.output
 
